@@ -23,6 +23,7 @@
 | **K** | The mod **refuses to run** if `pause-when-empty-seconds > 0`, because the purge would silently never fire (§4.11). |
 | **L** | Composes with vanilla **hardcore**: the spectator lock is bypassed, not disabled, and a resurrected player never becomes a spectator (§4.12). |
 | **M** | The lockout is called **Purgatory**; leaving it is **Resurrection** (intact) or **Reincarnation** (empty). Stakes are always named plainly as *Inventory, Ender Chest & XP* (§4.14). |
+| **N** | Reincarnation **destroys the animals you tamed**, and they are untouchable by anyone while you are in Purgatory (§11). |
 
 ---
 
@@ -684,3 +685,158 @@ anyone who can pardon is also immune to dying. This makes the mod awkward to tes
 must stay non-op and drive admin commands over RCON) and forces server owners to choose between
 having moderators and having moderators who can die. There is also no value meaning "nobody is
 exempt" — `0` means *everyone* bypasses, not no one. Worth splitting into two settings.
+
+---
+
+## 11. Reclaiming tamed animals (**N**)
+
+Wiping a player's files takes their inventory, ender chest and XP. It does not take a donkey
+standing at spawn with a chest full of diamonds -- and that is enough to defeat the whole
+mechanic. *"Nothing of your old life remains, except this stash I parked somewhere safe."*
+
+### 11.1 Why a UUID cannot answer the question
+
+A player's UUID does not change when they are reincarnated. So "is this animal still yours?"
+is unanswerable from ownership alone: a wolf tamed before you died and one tamed ten minutes
+ago in your current life look **identical**.
+
+The first design tracked *reincarnated players* in a set and untamed anything they owned. It
+was wrong for exactly this reason, and the flaw surfaced as a question rather than a bug --
+*"what if I have been reincarnated once already, then log off and come back to a pet I tamed
+since?"* The set would have freed it.
+
+**Each life gets an ID instead.** Taming stamps the animal with the ID of the life that claimed
+it, and the animal is only yours while the two match:
+
+| Situation | Animal's stamp | Your current life | Result |
+|---|---|---|---|
+| Tamed in life 1, you are in life 2 | `A` | `B` | destroyed |
+| Tamed in life 2, you log out and back in | `B` | `B` | still yours |
+| Tamed in life 2, you reincarnate again | `B` | `C` | destroyed |
+
+The animal carries its own provenance, which is what makes it correct for a horse that has sat
+in an unloaded chunk for a month.
+
+### 11.2 Where each ID lives
+
+**On the animal:** custom NBT via `addAdditionalSaveData` / `readAdditionalSaveData`. It travels
+with the entity in chunk data, so it survives restarts and is still right for animals nobody has
+visited in weeks. Verified to round-trip through `/data get` and through full server restarts.
+
+**On the player: in a file the mod owns**, not in playerdata. This was decided twice, the second
+time correctly. The sweep runs against loaded animals whose owner may be offline, in another
+dimension, or -- immediately after a reincarnation -- may have no playerdata at all, because the
+purge deleted it. A lookup that needs the player present cannot answer at the moment it matters
+most.
+
+It also gives resurrection the right behaviour for free: the ID is rotated **only** when the
+remains are destroyed, so a resurrected player is still living the same life and their animals
+never notice.
+
+### 11.3 Destroyed, not released
+
+Releasing was the first instinct -- the animal survives as a wild one, tameable again, the bond
+broken but the creature spared. It is wrong here for two reasons.
+
+For a wolf it is barely a penalty: the animal is standing right there and one bone undoes it.
+And for a chest animal it does not close the loophole at all -- a released donkey still holds
+its cargo. Dropping the cargo instead has the same hole with extra steps, because anything on
+the ground can be picked up.
+
+So the animal and everything on it are destroyed together. That also removed a whole accessor
+mixin: nothing ever has to reach into a horse's `protected` inventory to empty it.
+
+> This is a harsher call than it looks -- bred stats, names and years of work go with it. It was
+> made deliberately: *"this is hardcore, the whole point is to not die, and if you do you lose
+> everything."*
+
+### 11.4 Three class trees, three toggles
+
+Ownership is not one mechanism in Minecraft, and the config mirrors that rather than fighting it:
+
+| Config | Covers | Mechanism |
+|---|---|---|
+| `wipe.pets` | wolves, cats, parrots | `TamableAnimal` -- tame flag, sitting, owner reference |
+| `wipe.livestock` | horses, donkeys, mules, llamas, camels | `AbstractHorse` -- its own tame flag and inventory |
+| `wipe.foxes` | foxes | two independent trust slots |
+
+**Horses do not extend `TamableAnimal`.** Missing that would have left the single largest
+loophole intact, since a chest animal is the stash worth parking.
+
+`tameWithName` is the hook for horses rather than `setOwner`, because `readAdditionalSaveData`
+assigns the owner field directly and never calls it. Hooking something that ran on load would
+re-stamp the animal with the *current* life every time its chunk loaded, and it would never be
+reclaimed -- a bug that would have looked like the feature simply not working.
+
+### 11.5 Two guards against catastrophe
+
+Both exist to stop the feature doing something irreversible on a misunderstanding:
+
+- **No stamp, no action.** An animal without one was tamed before the feature existed. Acting on
+  a missing stamp would delete every pet on the server the first time the sweep ran.
+- **Unknown player, no action.** If we have never seen the owner, the lookup returns null rather
+  than a mismatch. Otherwise every animal belonging to anyone who had not logged in since the
+  feature landed would die the moment its chunk loaded.
+
+### 11.6 The sweep
+
+Every `wipe.petsCheckIntervalTicks` (default 20 -- one second) across all loaded entities. Cheap
+per entity: a type check, a null check, a string comparison.
+
+Frequent on purpose. The loophole is short-range -- park a loaded animal near spawn, die, and
+collect it on the walk back -- so a slow sweep leaves a window in which exactly that works.
+
+Deletion is **lazy by design**: an animal in an unloaded chunk is checked the moment someone
+loads it. No world scanning, no force-loading, no registry to go stale. Confirmed in testing --
+animals left in an unloaded chunk died as soon as the chunk came back.
+
+### 11.7 The grace period was still open
+
+Destroying the animals when the remains are destroyed closes the loophole at the *end* of the
+grace period. During the grace period itself the owner is offline, unable to defend anything,
+and the animals are still theirs. Four separate ways in, all now closed:
+
+| Vector | Closed by |
+|---|---|
+| Open the chest and empty it | `Mob.interact` returns FAIL |
+| Keep a screen open from before the death | mount menu's `stillValid` returns false; `ServerPlayer` closes it on its next tick |
+| Stay mounted and ride it away | the sweep ejects passengers |
+| Kill it and take the drops | `hurtServer` blocked on both class trees |
+
+Blocking **all** damage rather than only player attacks matters twice over: a wandering zombie
+killing an unattended donkey scatters exactly the same cargo, and it would destroy something a
+resurrection is meant to hand back intact.
+
+The `stillValid` approach is worth noting as a pattern. The alternative was hunting for which
+players had which screen open and closing them by hand; instead the menu answers the question
+honestly and vanilla does the closing. It cannot drift out of sync with the ward, because it
+*is* the ward.
+
+**The ward begins at death, not at entombment.** Keying it on `wipePending` left a fifteen-second
+window during the death screen. Small, and hard to exploit without knowing a death was coming --
+but "you had to be quick" is not a property worth designing in.
+
+### 11.8 Verified
+
+With two accounts, on Linux:
+
+- one player's death rotated only their own ID and destroyed only their animals; the other
+  player's were untouched
+- animals in unloaded chunks died when the chunk next loaded
+- a donkey's 32 diamond blocks were destroyed with it and did not hit the ground
+- a second player, mounted with the chest open at the moment of death, was ejected and locked
+  out **within one second**, and could not reopen it
+- damage refused from a server command, proving the block covers every source
+- resurrection lifted the ward immediately and preserved the animals -- the same `/damage`
+  command was refused, then applied a second later
+- stamps survived full server restarts, not merely chunk unloads
+
+### 11.9 Not covered
+
+Villager reputation (`GossipContainer`, keyed by player UUID on each villager) and trial vault
+reward tracking (`VaultServerData.rewardedPlayers`) both outlive a reincarnation. Vaults are the
+sharper of the two: a "brand-new" player finds a vault they cleared in a past life refuses them,
+with nothing to explain why.
+
+Other mods storing their own per-player data are untouched by any of this.
+

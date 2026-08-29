@@ -57,6 +57,7 @@ back and clears its records on the next start, so nobody is left in limbo.
 5. Rejoining during Purgatory shows how long until they may return, and whether resurrection
    is still possible.
 6. When Purgatory ends they are **reincarnated** — a brand-new player, greeted as such.
+   The animals they tamed are destroyed at the same moment.
 
 The lockout is **real time**. It keeps counting while the server is offline — a 6 hour
 lockout started at 22:00 has expired by 04:00 whether or not the server ran overnight.
@@ -90,6 +91,27 @@ than a bug:
 That second line is picked at random from `config/nixreaper/reincarnation.txt` — plain text, one
 phrase per line, ten included. Edit it and run `/nr admin reload`; no restart. Remove every
 phrase and the greeting appears on its own.
+
+### Your animals
+
+Reincarnation takes the animals you tamed, too. Wolves, cats, parrots, horses, donkeys, mules,
+llamas and camels are **destroyed** when your old life ends — along with anything they were
+carrying. (Foxes are not handled yet.)
+
+That last part is the point. Without it a chest donkey parked somewhere safe is a death-proof
+vault, and "nothing of your old life remains" is simply untrue. Releasing the animals instead
+would not help: a released donkey still holds its cargo, and dropping the cargo just puts it on
+the ground where it can be picked up.
+
+**While you are in Purgatory your animals cannot be touched by anyone.** Not ridden, not opened,
+not harmed — not even by monsters. You are offline and cannot defend them, so nobody gets to
+empty your donkey while you wait, and nothing can destroy something a resurrection is meant to
+give back.
+
+**A resurrection keeps them.** Only reincarnation takes them.
+
+Animals tamed *before* this feature was installed are never touched, so adding the mod to an
+existing world does not cull everyone's pets.
 
 ---
 
@@ -165,6 +187,10 @@ with `/nr admin config set`.
 | `wipe.stats` | `true` | Erase statistics |
 | `wipe.graceMinutes` | `5` | How long a pardon still restores everything |
 | `wipe.lockFiles` | `true` | Lock held files so nothing else can block the wipe |
+| `wipe.pets` | `true` | Destroy tamed wolves, cats and parrots on reincarnation |
+| `wipe.livestock` | `true` | Destroy tamed horses, donkeys, mules, llamas and camels — **and their cargo** |
+| `wipe.foxes` | `true` | Make foxes forget they trusted you. **Not yet implemented** — the key exists but does nothing |
+| `wipe.petsCheckIntervalTicks` | `20` | How often to look for animals belonging to an ended life |
 | `lockout.minutes` | `360` | Lockout length in real-time minutes (6 hours) |
 | `lockout.deathScreenSeconds` | `15` | How long the death screen is held |
 | `message.death` | — | Shown on the disconnect that follows a death |
@@ -214,8 +240,15 @@ saying so. `%unlock_time%` is still available if you want it — it just isn't u
   unable to craft things they had already discovered. In practice this is more noticeable
   than losing the advancements themselves.
 - **Whitelist and op status are never touched.** Neither are vanilla bans.
-- **Tamed pets and scoreboard scores are not erased.** Pets store their owner on the entity,
-  and scoreboards are keyed by player name in a shared file.
+- **Animals are checked lazily.** One in an unloaded chunk is dealt with the moment someone
+  loads that chunk, so there is no world scan and no startup cost.
+- **Scoreboard scores and teams survive.** Vanilla keys those by player *name* in a single
+  shared file, so removing one player's entries is not something this mod attempts.
+- **Villager reputation and trial-vault rewards survive.** Both are stored against your UUID out
+  in the world — on each villager, and in each vault — rather than in your player files. A
+  reincarnated player keeps their trade discounts, and still cannot re-loot a vault they cleared
+  in a previous life.
+- **Other mods' data survives.** Anything storing its own per-player records is untouched.
 
 ## License
 
