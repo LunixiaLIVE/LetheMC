@@ -9,6 +9,9 @@
     "ServerPlayerMixin",
     "TamableAnimalMixin",
     "AbstractHorseMixin",
+    "MobInteractWardMixin",
+    "LivingEntityWardMixin",
+    "MountMenuWardMixin",
     "ServerGamePacketListenerMixin"
   ],
   "injectors": {

@@ -45,6 +45,55 @@ public final class Pets {
         return false;
     }
 
+    /**
+     * True while this animal's owner is in Purgatory with their remains still intact.
+     *
+     * <p>Such an animal is in limbo alongside them: it cannot be interacted with, ridden,
+     * opened, or harmed by anything. The window is exactly the grace period.
+     *
+     * <p>Without this there is one loophole left. A chest animal is still its owner's during
+     * the grace period, and its owner is offline and unable to defend it -- so a friend could
+     * simply open the donkey and empty it, or kill it and collect what drops. Either way the
+     * belongings survive a death that was supposed to take them.
+     *
+     * <p>Blocking damage matters as much as blocking interaction, and not only against
+     * players: a wandering zombie killing an unattended donkey would spill the same cargo, and
+     * would destroy something a resurrection is meant to give back intact.
+     */
+    public static boolean isWarded(Entity entity) {
+        if (!(entity instanceof OwnableEntity ownable)) return false;
+        EntityReference<LivingEntity> ref = ownable.getOwnerReference();
+        if (ref == null) return false;
+        UUID ownerId = ref.getUUID();
+        if (ownerId == null) return false;
+
+        Ledger.Entry e = Ledger.get(ownerId);
+        if (e == null) return false;
+
+        // From the instant of death, not from entombment. Keying this on wipePending left the
+        // animals open for the fifteen seconds of the death screen -- a small window, but the
+        // owner is already beyond defending them, and "you had to be quick" is not a property
+        // worth designing in.
+        //
+        // PARDONED means resurrected and on their way back, so the ward lifts immediately.
+        // After the remains are destroyed the animal is deleted within a tick anyway, so
+        // warding it in the meantime costs nothing.
+        return !Ledger.STATE_PARDONED.equals(e.state);
+    }
+
+    /**
+     * Throws riders off warded animals.
+     *
+     * <p>The interaction block only stops someone <em>starting</em> to ride. Anyone already
+     * mounted when their owner died would stay mounted and could simply ride the animal away
+     * for the whole grace period. Called from the sweep, so it lands within a second of death.
+     */
+    private static void ejectRiders(Entity entity) {
+        if (!entity.getPassengers().isEmpty()) {
+            entity.ejectPassengers();
+        }
+    }
+
     /** Stamps a freshly tamed animal with the taming player's current life. */
     public static void stamp(Entity animal, LivingEntity owner) {
         if (owner == null || !(animal instanceof Incarnated stamped)) return;
@@ -97,6 +146,7 @@ public final class Pets {
         if (!c.wipePets && !c.wipeLivestock) return;
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity e : level.getAllEntities()) {
+                if (isWarded(e)) ejectRiders(e);
                 check(e);
             }
         }

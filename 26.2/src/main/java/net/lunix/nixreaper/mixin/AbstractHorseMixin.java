@@ -2,6 +2,8 @@ package net.lunix.nixreaper.mixin;
 
 import net.lunix.nixreaper.Incarnated;
 import net.lunix.nixreaper.Pets;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.animal.equine.AbstractHorse;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.storage.ValueInput;
@@ -47,6 +49,19 @@ public abstract class AbstractHorseMixin implements Incarnated {
     @Inject(method = "tameWithName", at = @At("TAIL"))
     private void nixreaper$stampOnTame(Player player, CallbackInfoReturnable<Boolean> cir) {
         Pets.stamp((AbstractHorse) (Object) this, player);
+    }
+
+    /**
+     * Horses override {@code hurtServer}, so the shared ward on LivingEntity is not a
+     * reliable place to stop damage reaching them. A chest animal that can be killed during
+     * the grace period spills its cargo, which is the whole loophole being closed.
+     */
+    @Inject(method = "hurtServer", at = @At("HEAD"), cancellable = true)
+    private void nixreaper$wardDamage(ServerLevel level, DamageSource source, float amount,
+                                      CallbackInfoReturnable<Boolean> cir) {
+        if (Pets.isWarded((AbstractHorse) (Object) this)) {
+            cir.setReturnValue(false);
+        }
     }
 
     @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
