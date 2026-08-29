@@ -24,7 +24,7 @@ public interface TrustStamped {
     /** NBT key. Serialised as {@code uuid=incarnation} pairs separated by semicolons. */
     String KEY = "nixreaper:trustStamps";
 
-    /** Never destroyed, only forgotten -- a fox that tolerated you was never yours to lose. */
+    /** Serialised flat: this is written for every fox that has ever been trusted. */
     static String encode(Map<UUID, String> stamps) {
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<UUID, String> e : stamps.entrySet()) {
