@@ -1,0 +1,32 @@
+# nixReaper test server -- known-good settings.
+#
+# pause-when-empty-seconds MUST be 0. nixReaper refuses to run otherwise: the hard
+# delete lives on the tick loop, and a paused server stops ticking exactly when a
+# dying player has just left, so the wipe would silently never happen.
+#
+# hardcore is baked into level.dat at world CREATION. Changing it here does nothing
+# to an existing world -- you must generate a new one.
+
+server-port=25565
+motd=nixReaper 0.1.0.2 test server
+online-mode=false
+enforce-secure-profile=false
+gamemode=survival
+force-gamemode=true
+difficulty=hard
+hardcore=true
+pvp=true
+spawn-protection=0
+max-players=5
+view-distance=8
+simulation-distance=6
+level-name=world
+allow-nether=true
+white-list=false
+enable-command-block=false
+sync-chunk-writes=true
+enable-rcon=true
+rcon.port=25575
+rcon.password=nixreapertest
+broadcast-rcon-to-ops=true
+pause-when-empty-seconds=0

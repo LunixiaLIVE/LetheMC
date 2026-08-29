@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "nixreaper",
+  "version": "${version}",
+  "name": "nixReaper",
+  "description": "Death wipes everything you own -- inventory, ender chest, XP, advancements, stats -- and locks you out of the server for a configurable stretch of real time. Server-side only; vanilla clients need nothing installed.",
+  "authors": ["LunixiaLIVE"],
+  "contact": {
+    "sources": "https://github.com/LunixiaLIVE/nixReaper"
+  },
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "net.lunix.nixreaper.NixReaper"
+    ]
+  },
+  "mixins": [
+    "nixreaper.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": ">=26.2"
+  }
+}
