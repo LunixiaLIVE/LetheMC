@@ -96,7 +96,12 @@ phrase and the greeting appears on its own.
 
 Reincarnation takes the animals you tamed, too. Wolves, cats, parrots, horses, donkeys, mules,
 llamas and camels are **destroyed** when your old life ends — along with anything they were
-carrying. (Foxes are not handled yet.)
+carrying.
+
+**Foxes work differently, because trust is shared.** A fox can trust two players, so one of them
+dying must not cost the other their fox. When your life ends a fox simply forgets you — and if
+that leaves nobody living who trusts it, the fox is destroyed too, along with whatever it was
+carrying. A fox trusted by a survivor keeps living; only your trust is removed.
 
 That last part is the point. Without it a chest donkey parked somewhere safe is a death-proof
 vault, and "nothing of your old life remains" is simply untrue. Releasing the animals instead
@@ -189,7 +194,7 @@ with `/nr admin config set`.
 | `wipe.lockFiles` | `true` | Lock held files so nothing else can block the wipe |
 | `wipe.pets` | `true` | Destroy tamed wolves, cats and parrots on reincarnation |
 | `wipe.livestock` | `true` | Destroy tamed horses, donkeys, mules, llamas and camels — **and their cargo** |
-| `wipe.foxes` | `true` | Make foxes forget they trusted you. **Not yet implemented** — the key exists but does nothing |
+| `wipe.foxes` | `true` | Make foxes forget they trusted you, and destroy those no living player trusts |
 | `wipe.petsCheckIntervalTicks` | `20` | How often to look for animals belonging to an ended life |
 | `lockout.minutes` | `360` | Lockout length in real-time minutes (6 hours) |
 | `lockout.deathScreenSeconds` | `15` | How long the death screen is held |

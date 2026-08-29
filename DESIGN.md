@@ -768,6 +768,38 @@ assigns the owner field directly and never calls it. Hooking something that ran 
 re-stamp the animal with the *current* life every time its chunk loaded, and it would never be
 reclaimed -- a bug that would have looked like the feature simply not working.
 
+**Foxes needed their own rule, twice over.** Trust is not ownership and it is not exclusive: a
+fox holds two independent slots, filled by whoever fed each parent, so one player's death must
+not empty the other's slot. Vanilla's `clearTrusted` empties both at once, which is precisely
+the behaviour to avoid, and it is `private` -- hence `FoxAccessor` reaching the two
+`DATA_TRUSTED_ID` accessors directly so each can be cleared alone.
+
+The stamps are keyed by **trusted UUID, not by slot number**. Vanilla shifts entries between the
+two slots as trust changes, so a positional record would attach the wrong life to the wrong
+player the first time that happened. Confirmed in testing: a dual-trust kit stored its two
+stamps in the opposite order to the `Trusted` list, and both still resolved correctly.
+
+The load-time trap that caught horses does *not* apply here. `Fox.readAdditionalSaveData`
+restores trust straight from `TRUSTED_LIST_CODEC` into the data slots and never calls
+`addTrustedEntity`, so hooking that method stamps only genuine new trust. Verified against the
+26.2 bytecode rather than assumed, because the horse version of this mistake would have been
+invisible.
+
+The first implementation stopped there: forget the player, never destroy the fox, on the
+reasoning that *a fox that tolerated you was never yours to lose*. That was wrong for the same
+reason releasing a donkey was wrong -- it left a fox farm standing through a death, which is a
+kept herd surviving in everything but name. The rule now is:
+
+> After stale trusts are cleared, if **no living player trusts the fox**, it is destroyed along
+> with whatever is in its mouth. If any surviving trust remains, only the stale slots are cleared
+> and the fox lives.
+
+This generalises past the two-player case rather than special-casing it. Two trustees who have
+both died leave no surviving trust, so the fox goes -- and it converges the same way if they die
+at different times, since the second death makes that player the sole remaining trustee. An
+*unstamped* trust counts as surviving, so a fox trusted before the feature existed is never
+destroyed by it.
+
 ### 11.5 Two guards against catastrophe
 
 Both exist to stop the feature doing something irreversible on a misunderstanding:

@@ -12,6 +12,8 @@
     "MobInteractWardMixin",
     "LivingEntityWardMixin",
     "MountMenuWardMixin",
+    "FoxMixin",
+    "FoxAccessor",
     "ServerGamePacketListenerMixin"
   ],
   "injectors": {

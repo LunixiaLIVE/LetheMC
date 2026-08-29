@@ -1,5 +1,7 @@
 package net.lunix.nixreaper;
 
+import net.lunix.nixreaper.mixin.FoxAccessor;
+import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -8,7 +10,10 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.animal.equine.AbstractHorse;
+import net.minecraft.world.entity.animal.fox.Fox;
 
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -30,8 +35,8 @@ import java.util.UUID;
  * emptying of chests, no items on the floor. It also means this class never has to reach into
  * a horse's inventory, which removes a whole accessor mixin.
  *
- * <p><b>Foxes are deliberately excluded</b> -- see {@code checkFox}. A fox that trusts you was
- * never yours to lose.
+ * <p><b>Foxes follow a different rule</b> -- see {@code checkFox}. Trust is shared and not
+ * ownership, so a fox is destroyed only when no living player trusts it any more.
  */
 public final class Pets {
 
@@ -61,7 +66,10 @@ public final class Pets {
      * would destroy something a resurrection is meant to give back intact.
      */
     public static boolean isWarded(Entity entity) {
-        if (!(entity instanceof OwnableEntity ownable)) return false;
+        if (!(entity instanceof OwnableEntity ownable)) {
+            // Foxes are not ownable, and are warded only when the whole fox is doomed.
+            return entity instanceof Fox fox && isFoxWarded(fox);
+        }
         EntityReference<LivingEntity> ref = ownable.getOwnerReference();
         if (ref == null) return false;
         UUID ownerId = ref.getUUID();
@@ -79,6 +87,55 @@ public final class Pets {
         // After the remains are destroyed the animal is deleted within a tick anyway, so
         // warding it in the meantime costs nothing.
         return !Ledger.STATE_PARDONED.equals(e.state);
+    }
+
+    /** A trust slot that is empty, that dooms the fox, or that keeps it safe. */
+    private static final int SLOT_EMPTY = 0, SLOT_DOOMED = 1, SLOT_SAFE = -1;
+
+    /**
+     * True while every player a fox trusts is in Purgatory with their remains intact.
+     *
+     * <p>The ward protects what is about to be destroyed. A fox whose only trust belongs to a
+     * dead player is discarded when their remains are, so without this anyone could kill it
+     * during the grace period and pocket whatever it was carrying -- salvaging an item the
+     * death was meant to take. It is the chest-donkey loophole in miniature.
+     *
+     * <p>A fox that any living player still trusts is left alone completely, even while one of
+     * its two trustees is in Purgatory. It survives the reincarnation, so there is nothing to
+     * protect, and freezing it would penalise a co-owner who did not die.
+     *
+     * <p><b>This asks the ledger, not the stamps.</b> During the grace period the dead player's
+     * incarnation has not rotated yet -- that happens only when the remains are destroyed -- so
+     * nothing is stale during the very window the ward covers. Testing staleness here would
+     * produce a ward that never once fired.
+     */
+    private static boolean isFoxWarded(Fox fox) {
+        if (!Config.get().wipeFoxes) return false;
+        if (!(fox instanceof TrustStamped stamped)) return false;
+        Map<UUID, String> stamps = stamped.nixreaper$trustStamps();
+        if (stamps.isEmpty()) return false;
+
+        int s0 = slotState(fox, FoxAccessor.nixreaper$trusted0(), stamps);
+        int s1 = slotState(fox, FoxAccessor.nixreaper$trusted1(), stamps);
+
+        if (s0 == SLOT_SAFE || s1 == SLOT_SAFE) return false;
+        return s0 == SLOT_DOOMED || s1 == SLOT_DOOMED;
+    }
+
+    private static int slotState(Fox fox,
+                                 EntityDataAccessor<Optional<EntityReference<LivingEntity>>> slot,
+                                 Map<UUID, String> stamps) {
+        Optional<EntityReference<LivingEntity>> held = fox.getEntityData().get(slot);
+        if (held.isEmpty()) return SLOT_EMPTY;
+
+        UUID trusted = held.get().getUUID();
+        // Unreadable or unstamped trust is trust this mod will never act on, so the fox is not
+        // headed for destruction and has nothing to be protected from.
+        if (trusted == null || stamps.get(trusted) == null) return SLOT_SAFE;
+
+        Ledger.Entry e = Ledger.get(trusted);
+        if (e == null || Ledger.STATE_PARDONED.equals(e.state)) return SLOT_SAFE;
+        return SLOT_DOOMED;
     }
 
     /**
@@ -135,6 +192,82 @@ public final class Pets {
     }
 
     /**
+     * A fox forgets the players whose lives have ended, and is destroyed if that leaves nobody.
+     *
+     * <p>Trust is shared, so a fox cannot simply be treated as one player's property. Each slot
+     * is cleared independently: one trustee dying must not cost the other anything, and vanilla's
+     * own {@code clearTrusted} empties both at once, which is exactly the behaviour to avoid.
+     *
+     * <p>But a fox that no living player trusts is not a wild animal that merely tolerated
+     * someone -- it is a kept animal whose keeper no longer exists. Left alive it would be a farm
+     * that survives death, the same loophole as a chest donkey parked somewhere safe. So once the
+     * last surviving trust is gone the fox is destroyed, along with whatever it was carrying.
+     *
+     * <p>A trust with no stamp -- granted before this feature existed -- counts as surviving.
+     * Acting on what we cannot date would cull foxes the mod never saw being trusted.
+     */
+    private static void checkFox(Fox fox) {
+        if (!Config.get().wipeFoxes) return;
+        if (!(fox instanceof TrustStamped stamped)) return;
+        Map<UUID, String> stamps = stamped.nixreaper$trustStamps();
+        if (stamps.isEmpty()) return;
+
+        EntityDataAccessor<Optional<EntityReference<LivingEntity>>> slot0 = FoxAccessor.nixreaper$trusted0();
+        EntityDataAccessor<Optional<EntityReference<LivingEntity>>> slot1 = FoxAccessor.nixreaper$trusted1();
+
+        boolean held0 = fox.getEntityData().get(slot0).isPresent();
+        boolean held1 = fox.getEntityData().get(slot1).isPresent();
+        boolean stale0 = isStale(fox, slot0, stamps);
+        boolean stale1 = isStale(fox, slot1, stamps);
+
+        if (!stale0 && !stale1) return;
+
+        // Someone whose life is still running trusts this fox, so it is still somebody's.
+        if ((held0 && !stale0) || (held1 && !stale1)) {
+            if (stale0) forget(fox, slot0, stamps);
+            if (stale1) forget(fox, slot1, stamps);
+            return;
+        }
+
+        // Nobody living trusts it. discard() takes the fox and anything in its mouth together,
+        // with no drops -- an item on the ground would just be picked back up.
+        NixReaper.LOGGER.info("Removing fox at {} -- no living player trusts it",
+                fox.blockPosition().toShortString());
+        fox.discard();
+    }
+
+    /** Whether this slot holds a player whose life has since ended. */
+    private static boolean isStale(Fox fox,
+                                   EntityDataAccessor<Optional<EntityReference<LivingEntity>>> slot,
+                                   Map<UUID, String> stamps) {
+        Optional<EntityReference<LivingEntity>> held = fox.getEntityData().get(slot);
+        if (held.isEmpty()) return false;
+
+        UUID trusted = held.get().getUUID();
+        if (trusted == null) return false;
+
+        String stamp = stamps.get(trusted);
+        if (stamp == null) return false; // trusted before the feature existed
+
+        String living = Incarnations.peek(trusted);
+        if (living == null) return false; // a player we have never seen
+        return !living.equals(stamp);
+    }
+
+    private static void forget(Fox fox,
+                               EntityDataAccessor<Optional<EntityReference<LivingEntity>>> slot,
+                               Map<UUID, String> stamps) {
+        Optional<EntityReference<LivingEntity>> held = fox.getEntityData().get(slot);
+        if (held.isEmpty()) return;
+        UUID trusted = held.get().getUUID();
+
+        fox.getEntityData().set(slot, Optional.empty());
+        if (trusted != null) stamps.remove(trusted);
+        NixReaper.LOGGER.info("Fox at {} forgot a player whose life has ended",
+                fox.blockPosition().toShortString());
+    }
+
+    /**
      * The periodic sweep.
      *
      * <p>Runs often on purpose. The loophole it closes is short-range -- park a loaded animal
@@ -143,9 +276,13 @@ public final class Pets {
      */
     public static void sweep(MinecraftServer server) {
         Config c = Config.get();
-        if (!c.wipePets && !c.wipeLivestock) return;
+        if (!c.wipePets && !c.wipeLivestock && !c.wipeFoxes) return;
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity e : level.getAllEntities()) {
+                if (e instanceof Fox fox) {
+                    checkFox(fox);
+                    continue;
+                }
                 if (isWarded(e)) ejectRiders(e);
                 check(e);
             }

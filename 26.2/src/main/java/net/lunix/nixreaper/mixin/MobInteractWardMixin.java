@@ -34,7 +34,7 @@ public class MobInteractWardMixin {
     private void nixreaper$wardInteraction(Player player, InteractionHand hand, Vec3 pos,
                                            CallbackInfoReturnable<InteractionResult> cir) {
         // Runs for every mob interaction on the server, so the cheap negative case matters:
-        // isWarded rejects anything that is not ownable on its first line.
+        // isWarded rejects anything that is neither ownable nor a fox in two instanceof checks.
         if (Pets.isWarded((Mob) (Object) this)) {
             cir.setReturnValue(InteractionResult.FAIL);
         }

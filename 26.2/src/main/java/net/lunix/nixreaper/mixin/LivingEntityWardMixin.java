@@ -31,8 +31,9 @@ public class LivingEntityWardMixin {
     private void nixreaper$wardDamage(ServerLevel level, DamageSource source, float amount,
                                       CallbackInfoReturnable<Boolean> cir) {
         // The hottest path this mod touches -- every damage event for every living entity.
-        // isWarded's first line is an instanceof that rejects players, monsters and villagers
-        // before anything else happens.
+        // isWarded rejects players, monsters and villagers in two instanceof checks before
+        // anything else happens. This is also what stops a warded fox being killed for the
+        // item in its mouth during its owner's grace period.
         if (Pets.isWarded((LivingEntity) (Object) this)) {
             cir.setReturnValue(false);
         }
