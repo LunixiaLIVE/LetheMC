@@ -45,18 +45,71 @@ public final class Messages {
      * that was not the player's fault.
      */
     private static String graceLine(boolean restorable, long grace) {
+        // Names the stakes plainly rather than poetically. "Purgatory" is good flavour for the
+        // state a player is IN, but what they stand to lose has to be unambiguous -- a player
+        // reading "your remains" should not have to work out that it means their gear.
+        String stakes = stakes();
+        if (stakes == null) {
+            // Every wipe toggle is off: this server only holds people, it takes nothing.
+            // Saying anything about belongings here would be false.
+            return restorable
+                    ? "§7Nothing of yours is taken. An admin can release you early."
+                    : "§7Nothing of yours was taken.";
+        }
+
+        // The spawn point lives in playerdata, so wiping it takes that too: the bed block
+        // survives in the world but the association does not, and the player wakes at world
+        // spawn with a walk home ahead of them. Not obvious from "your items are gone" -- but
+        // only true when wipe.playerData is actually on.
+        boolean losesSpawn = Config.get().wipePlayerData;
+
         if (!restorable) {
-            return "§8Your items have been permanently erased.";
+            return "§8Your " + stakes + " are gone.\n"
+                    + (losesSpawn
+                        ? "§8You will wake at world spawn with nothing,\n§8and no bed to return to."
+                        : "§8You will be reincarnated with nothing.");
         }
         if (grace <= 0) {
             // Still on disk but past the deadline -- a delete that has not landed yet
             // (retrying after an IO error). Promising a countdown here would be a lie in the
             // other direction, so say only what is certainly true.
-            return "§6Your items are still recoverable, but only for moments.\n"
-                    + "§7Ask an admin to pardon you §lnow§r§7.";
+            return "§6Your " + stakes + " can still be saved,\n"
+                    + "§6but only for moments. §7Ask an admin to resurrect you §lnow§r§7.";
         }
-        return "§6Your items are held for another §e" + humanize(grace)
-                + "§6.\n§7Ask an admin to pardon you before then and you get everything back.";
+        return "§6Your " + stakes + " are held for §e" + humanize(grace) + "§6.\n"
+                + "§7An admin can resurrect you until then."
+                + (losesSpawn ? "\n§8Otherwise you wake at world spawn with nothing." : "");
+    }
+
+    /**
+     * What this server actually takes, phrased as an English list.
+     *
+     * <p>Built from the live {@code wipe.*} toggles rather than hardcoded, so the message can
+     * never promise to take something the config has switched off. An admin who disables
+     * {@code wipe.stats} should not have players told their statistics are at risk.
+     *
+     * <p>Read at call time, so {@code /nr admin config set} and {@code reload} are reflected
+     * immediately without touching the templates.
+     *
+     * @return e.g. "Inventory, Ender Chest, XP, Advancements & Statistics", or null if the
+     *         server has been configured to take nothing at all.
+     */
+    public static String stakes() {
+        Config c = Config.get();
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        if (c.wipePlayerData) {
+            // One file, but three things a player thinks of separately.
+            parts.add("Inventory");
+            parts.add("Ender Chest");
+            parts.add("XP");
+        }
+        if (c.wipeAdvancements) parts.add("Advancements");
+        if (c.wipeStats) parts.add("Statistics");
+
+        if (parts.isEmpty()) return null;
+        if (parts.size() == 1) return parts.get(0);
+        return String.join(", ", parts.subList(0, parts.size() - 1))
+                + " & " + parts.get(parts.size() - 1);
     }
 
     /** "2h 14m", "45m", "30s" */

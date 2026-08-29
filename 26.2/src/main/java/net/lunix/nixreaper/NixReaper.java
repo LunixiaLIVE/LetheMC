@@ -81,6 +81,16 @@ public class NixReaper implements ModInitializer {
      */
     private static final int AUTO_RESPAWN_DELAY_TICKS = 1;
 
+    /**
+     * Players admitted back with nothing, owed the reincarnation greeting on arrival.
+     *
+     * <p>Populated at the join gate (which runs before a player object exists, so the message
+     * cannot be sent there) and consumed by the JOIN event a moment later. Deliberately NOT
+     * persisted: if the server restarts between those two points the player simply misses a
+     * flavour line, which is not worth a ledger entry outliving its purpose.
+     */
+    private static final Set<UUID> AWAITING_REINCARNATION = new HashSet<>();
+
     private static MinecraftServer server;
 
     /**
@@ -106,6 +116,7 @@ public class NixReaper implements ModInitializer {
                 return;
             }
 
+            Taunts.load();
             recover(s);
             LOGGER.info("nixReaper ready -- lockout {} min, grace {} min",
                     Config.get().lockoutMinutes, Config.get().wipeGraceMinutes);
@@ -138,6 +149,7 @@ public class NixReaper implements ModInitializer {
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, s) -> {
             if (standingDown) return;
+            greetReincarnated(handler.getPlayer());
             retirePardonIfAlive(handler.getPlayer());
         });
 
@@ -414,8 +426,15 @@ public class NixReaper implements ModInitializer {
             Ledger.Entry e = Ledger.get(uuid);
             if (e == null || e.wipePending) continue;
             if (Ledger.STATE_LOCKED.equals(e.state) && e.expired(now)) {
+                // Mark the reincarnation HERE, not at the join gate. This is the moment it
+                // happens, and it is also the moment the evidence is destroyed: the entry is
+                // gone within a tick of expiry, so a player logging in even seconds later
+                // would reach checkLogin with nothing to read and never be greeted.
+                if (e.dataState() == Ledger.DataState.ERASED || !e.restorable()) {
+                    AWAITING_REINCARNATION.add(uuid);
+                }
                 Ledger.remove(uuid);
-                LOGGER.info("{} lockout expired", e.name);
+                LOGGER.info("{} left Purgatory -- reincarnated", e.name);
             }
         }
     }
@@ -475,6 +494,31 @@ public class NixReaper implements ModInitializer {
     // ------------------------------------------------------------------
     // Hooks used by mixins
     // ------------------------------------------------------------------
+
+    /**
+     * The death-screen line, built from {@code message.deathScreen}.
+     *
+     * <p>Called while the player is still inside {@code die()}, so there is no ledger entry
+     * yet -- {@code %time_remaining%} therefore reflects the configured lockout rather than a
+     * live countdown. That is the right value anyway: the clock has not started.
+     *
+     * <p>Falls through to the vanilla message untouched when the mod is inert or the player is
+     * exempt, so a server that is standing down never claims to have done something.
+     */
+    public static Component deathScreenMessage(ServerPlayer player, Component vanillaMessage) {
+        if (standingDown || player == null || isExempt(player)) return vanillaMessage;
+
+        String template = Config.get().messageDeathScreen;
+        if (template == null || template.isBlank()) return vanillaMessage;
+
+        String reason = vanillaMessage == null ? "" : vanillaMessage.getString();
+        String out = template
+                .replace("%death_reason%", reason)
+                .replace("%player%", player.getName().getString())
+                .replace("%time_remaining%", Messages.humanize(Config.get().lockoutMinutes * 60_000L))
+                .replace("%grace_remaining%", Messages.humanize(Config.get().wipeGraceMinutes * 60_000L));
+        return Component.literal(out);
+    }
 
     /** True while this player is inside death processing -- forces keepInventory on. */
     public static boolean isDying(UUID uuid) {
@@ -565,6 +609,7 @@ public class NixReaper implements ModInitializer {
                 continue;
             }
 
+            autoRespawning = true;
             try {
                 // Press the button on their behalf rather than calling PlayerList.respawn
                 // directly. Vanilla does three more things straight after that call --
@@ -580,12 +625,13 @@ public class NixReaper implements ModInitializer {
                 // Leave the entry in place so the player can still click through manually.
                 LOGGER.error("Auto-respawn failed for {}; they can respawn manually", e.name, ex);
                 continue;
+            } finally {
+                autoRespawning = false;
             }
 
-            // The packet handler's TAIL retires the ledger entry; if it somehow did not,
-            // clear it here so the pardon cannot be spent twice.
+            // The packet handler's TAIL retires the entry and logs. If it somehow did not,
+            // clear it here so a resurrection cannot be spent twice.
             if (Ledger.get(uuid) != null) Ledger.remove(uuid);
-            LOGGER.info("{} auto-respawned after pardon -- inventory and XP intact", e.name);
         }
     }
 
@@ -603,6 +649,15 @@ public class NixReaper implements ModInitializer {
         return player != null && PARDONED_RESPAWN.contains(player.getUUID());
     }
 
+    /**
+     * True while the server is driving the respawn itself rather than the player clicking.
+     *
+     * <p>Only affects wording. Auto-respawn works by replaying the respawn packet, so the
+     * packet handler's TAIL runs for both paths and logged its own line on top of the
+     * auto-respawn's -- one respawn, two log entries, and the pair could not be told apart.
+     */
+    private static boolean autoRespawning = false;
+
     /** Ends the bracket and retires the ledger entry -- the pardon is now fully spent. */
     public static void endPardonedRespawn(ServerPlayer player) {
         if (player == null) return;
@@ -611,7 +666,8 @@ public class NixReaper implements ModInitializer {
         Ledger.Entry e = Ledger.get(uuid);
         if (e != null && Ledger.STATE_PARDONED.equals(e.state)) {
             Ledger.remove(uuid);
-            LOGGER.info("{} respawned after pardon with inventory and XP intact", e.name);
+            LOGGER.info("{} {} after resurrection -- Inventory, Ender Chest & XP intact",
+                    e.name, autoRespawning ? "auto-respawned" : "respawned");
         }
     }
 
@@ -659,22 +715,67 @@ public class NixReaper implements ModInitializer {
             Ledger.put(uuid, e);
         }
 
+        // Coming back with nothing -- that is a reincarnation, and it should be said out
+        // loud rather than leaving them to work out why their inventory is empty.
+        if (e.dataState() == Ledger.DataState.ERASED || !e.restorable()) {
+            AWAITING_REINCARNATION.add(uuid);
+        }
+
         Ledger.remove(uuid);
         return null;
     }
 
-    public static boolean isExempt(ServerPlayer player) {
-        return hasBypass(player.permissions());
+    /** Marks a player as owed the greeting -- used by a pardon that came too late. */
+    public static void markReincarnated(UUID uuid) {
+        AWAITING_REINCARNATION.add(uuid);
     }
 
     /**
-     * 26.x replaced integer permission levels with named Permission objects. The config
-     * still speaks in 0-4 because that is what server admins know, so map it here rather
-     * than leaking the new vocabulary into the config file.
+     * Tells a returning player what happened to them, once.
+     *
+     * <p>Without this, Purgatory simply ends and they appear holding nothing, with no
+     * explanation anywhere on screen -- which reads like a bug rather than the mechanic.
      */
-    public static boolean hasBypass(PermissionSet set) {
-        int level = Config.get().bypassPermissionLevel;
-        if (level <= 0) return true;
+    private static void greetReincarnated(ServerPlayer player) {
+        if (player == null) return;
+        if (!AWAITING_REINCARNATION.remove(player.getUUID())) return;
+
+        String text = Config.get().messageReincarnation
+                .replace("%player%", player.getName().getString());
+        String taunt = Taunts.pick();
+        if (taunt != null && !taunt.isBlank()) {
+            text = text + "\n§7" + taunt;
+        }
+        player.sendSystemMessage(Component.literal(text));
+        LOGGER.info("{} reincarnated", player.getName().getString());
+    }
+
+    /** Exempt from dying entirely -- nixReaper ignores this player's deaths. */
+    public static boolean isExempt(ServerPlayer player) {
+        return meetsLevel(player.permissions(), Config.get().bypassPermissionLevel);
+    }
+
+    /**
+     * Allowed to run {@code /nr admin ...}.
+     *
+     * <p>Deliberately a separate question from {@link #isExempt}. While the two shared one
+     * setting an admin could either administer or be mortal, never both -- so on a server whose
+     * whole premise is that death costs something, the person running it was quietly exempt.
+     */
+    public static boolean canAdmin(PermissionSet set) {
+        return meetsLevel(set, Config.get().adminPermissionLevel);
+    }
+
+    /**
+     * 26.x replaced integer permission levels with named Permission objects. The config still
+     * speaks in 0-4 because that is what server admins know, so map it here rather than
+     * leaking the new vocabulary into the config file.
+     *
+     * @param level -1 nobody, 0 everyone, 1-4 that permission and above.
+     */
+    private static boolean meetsLevel(PermissionSet set, int level) {
+        if (level < 0) return false;  // nobody -- the point of the default
+        if (level == 0) return true;  // everyone
         Permission required = switch (level) {
             case 1 -> Permissions.COMMANDS_MODERATOR;
             case 2 -> Permissions.COMMANDS_GAMEMASTER;

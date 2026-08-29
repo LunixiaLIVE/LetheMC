@@ -1,7 +1,10 @@
 # nixReaper
 
-Death costs you everything — **including your ender chest** — and locks you out of the server
-for a set amount of real time.
+Death costs you everything — **including your ender chest** — and sends you to **Purgatory**:
+locked out of the server for a set amount of real time.
+
+You leave Purgatory one of two ways. An admin can **resurrect** you, and you return exactly as
+you were. Or you wait it out and are **reincarnated** — you return, but as no one.
 
 Server-side only. Players connect with a vanilla client; nothing to install on their end.
 
@@ -47,29 +50,46 @@ back and clears its records on the next start, so nobody is left in limbo.
 ## What happens when a player dies
 
 1. **Nothing drops.** There is no body to loot and no items on the ground.
-2. The death screen stays up for 15 seconds so they can read what killed them.
-3. They are disconnected and locked out for `lockout.minutes` (6 hours by default).
-4. Their inventory, ender chest, XP, advancements and statistics are erased.
-5. Rejoining before the lockout ends shows a live `DD:HH:MM:SS` countdown, plus how long a
-   pardon can still undo it.
-6. When it expires they come back as a brand-new player.
+2. The death screen stays up for 15 seconds so they can read what killed them. It reads
+   *"...& sent to Purgatory"*.
+3. They are disconnected and enter **Purgatory** for `lockout.minutes` (6 hours by default).
+4. Their inventory, ender chest, XP, advancements and statistics are taken.
+5. Rejoining during Purgatory shows how long until they may return, and whether resurrection
+   is still possible.
+6. When Purgatory ends they are **reincarnated** — a brand-new player, greeted as such.
 
 The lockout is **real time**. It keeps counting while the server is offline — a 6 hour
 lockout started at 22:00 has expired by 04:00 whether or not the server ran overnight.
 
-### The grace period
+### Resurrection
 
-For `wipe.graceMinutes` after a death (5 by default), `/nr admin pardon <player>` gives the
-player **everything** back — items, worn armour, ender chest, XP, advancements, stats — and
-lifts the lockout. Use it for deaths that were not the player's fault: a lag spike, a bad chunk
-load, your own mistake.
+For `wipe.graceMinutes` after a death (5 by default) the player's belongings still exist, and
+`/nr admin pardon <player>` — or `/nr admin resurrect <player>`, the same command — gives back
+**everything**: inventory, worn armour, ender chest, XP, advancements, stats. They rejoin and
+are placed back in the world at their bed or spawn, alive, without even seeing a death screen.
 
-After that window the data is gone for good and a pardon only lifts the lockout. The player is
-told which of the two applies whenever they try to rejoin.
+Use it for deaths that were not the player's fault: a lag spike, a bad chunk load, your own
+mistake.
 
-Admins **cannot pardon themselves**, only other people. Otherwise the penalty is optional for
+After that window the belongings are gone for good. The same command still works, but it only
+releases them from Purgatory early — they return with nothing. `/nr admin status <player>`
+tells you which outcome you will get **before** you decide.
+
+Admins **cannot resurrect themselves**, only other people. Otherwise the penalty is optional for
 anyone holding the permission. A genuinely bogus death is still recoverable — by another admin,
 or from the server console.
+
+### Reincarnation
+
+When Purgatory ends the player is greeted, so an empty inventory reads as the mechanic rather
+than a bug:
+
+> **You have been reincarnated.** Nothing of your old life remains.
+> *Maybe this time you won't be so careless.*
+
+That second line is picked at random from `config/nixreaper/reincarnation.txt` — plain text, one
+phrase per line, ten included. Edit it and run `/nr admin reload`; no restart. Remove every
+phrase and the greeting appears on its own.
 
 ---
 
@@ -86,14 +106,16 @@ Root command is `/nixreaper`, aliased to `/nr`.
 
 ### Admin
 
-Requires the op level set by `bypass.permissionLevel` (default 4). The server console always
-qualifies.
+Requires the op level set by `admin.permissionLevel` (default 4). The server console always
+qualifies — which is what makes a solo admin's own bogus death recoverable, since they cannot
+resurrect themselves.
 
 | Command | Does |
 |---|---|
 | `/nr admin list` | Everyone currently locked out |
 | `/nr admin status <player>` | Their lockout, where their data is, whether a pardon still restores it |
-| `/nr admin pardon <player>` | Lift the lockout, and restore everything if inside the grace period. **You cannot pardon yourself** — ask another admin or use the console |
+| `/nr admin pardon <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot pardon yourself** — ask another admin or use the console |
+| `/nr admin resurrect <player>` | Alias for `pardon` — same command, thematic name |
 | `/nr admin purge <player>` | Erase their data now, skipping the grace period |
 | `/nr admin lock <player> [minutes]` | Lock someone out manually |
 | `/nr admin config list` | Show all settings |
@@ -101,9 +123,33 @@ qualifies.
 | `/nr admin config set <key> <value>` | Change one setting, saved immediately |
 | `/nr admin reload` | Re-read the config from disk |
 
-> **Heads up:** the permission level that grants `/nr admin` is the same one that makes a
-> player exempt from dying. Anyone who can pardon is also immune. Set
-> `bypass.permissionLevel` with that in mind.
+### Who dies, and who can administer
+
+These are two separate settings, so you are not forced to choose between having admins and
+having stakes.
+
+| Goal | `bypass.permissionLevel` | `admin.permissionLevel` |
+|---|---|---|
+| **Nobody is safe, admins can still help** *(default)* | `-1` | `4` |
+| Only the owner is immune | `4` | `4` |
+| Moderators can resurrect; only the owner is immune | `4` | `3` |
+| Builders immune, moderators mortal | `2` | `3` |
+
+The default means you can resurrect other people and still face Purgatory yourself, which is
+usually what you want on a server whose whole premise is that death costs something. `/nr info`
+tells players when nobody is exempt, so it is visible rather than assumed.
+
+Both are settable in-game and take effect immediately:
+
+```
+/nr admin config set bypass.permissionLevel -1
+/nr admin config set admin.permissionLevel 3
+/nr admin reload
+```
+
+> **Upgrading?** An existing `config.json` already has `bypassPermissionLevel` written out and
+> keeps whatever it says, so your current behaviour does not change. Only fresh installs get
+> the `-1` default. Set it explicitly if you want the new behaviour.
 
 ---
 
@@ -122,8 +168,11 @@ with `/nr admin config set`.
 | `lockout.minutes` | `360` | Lockout length in real-time minutes (6 hours) |
 | `lockout.deathScreenSeconds` | `15` | How long the death screen is held |
 | `message.death` | — | Shown on the disconnect that follows a death |
-| `message.rejoin` | — | Shown when a locked-out player tries to join |
-| `bypass.permissionLevel` | `4` | Op level exempt from the penalty (`0` exempts everyone) |
+| `message.rejoin` | — | Shown when someone in Purgatory tries to join |
+| `message.deathScreen` | — | The one line of the in-game death screen a server can control. **Must stay one line** — see below |
+| `message.reincarnation` | — | Greeting when Purgatory ends |
+| `bypass.permissionLevel` | `-1` | Who is exempt from dying. `-1` nobody, `0` everyone, `1`-`4` that op level and above |
+| `admin.permissionLevel` | `4` | Who can run `/nr admin ...`. `0`-`4` |
 
 **`lockout.minutes` must be greater than `wipe.graceMinutes`.** Both are in minutes, so at the
 defaults that means a minimum lockout of 6 minutes. Values that break the rule are rejected with a message
@@ -143,19 +192,24 @@ boot.
 | `%grace_remaining_short%` | `00:00:04:12` — `DD:HH:MM:SS` |
 | `%grace_line%` | A ready-written sentence covering both cases |
 
-Colour codes use `§`. Use `\n` for a line break.
+Colour codes use `§`. Use `\n` for a line break — **except in `message.deathScreen`**, which
+must stay a single line. The in-game death screen places that text 15 pixels above "Score:"
+with no wrapping, so anything longer collides with it.
 
-The default rejoin message shows a **countdown**, not a clock time. An absolute unlock time has
-to be printed in some timezone, and the server's is not necessarily the player's, with nothing
-on screen saying so. `%unlock_time%` is still available if you want it — it just isn't the
-default.
+Everything else on that screen — "Game Over!", "Score:", and the buttons — comes from the
+client's own language file. A server-side mod cannot change those, which is why the death
+message is the only line nixReaper touches.
+
+Times are shown as **durations**, never clock times. An absolute unlock time has to be printed
+in some timezone, and the server's is not necessarily the player's, with nothing on screen
+saying so. `%unlock_time%` is still available if you want it — it just isn't used by default.
 
 ---
 
 ## Notes
 
-- **Ops are exempt by default.** Test with a non-op account, or you will die and nothing will
-  happen.
+- **Ops are no longer exempt by default.** If you *want* an immune admin, set
+  `bypass.permissionLevel` to their op level.
 - **Recipe books reset.** Recipe unlocks live in the advancement file, so a player returns
   unable to craft things they had already discovered. In practice this is more noticeable
   than losing the advancements themselves.

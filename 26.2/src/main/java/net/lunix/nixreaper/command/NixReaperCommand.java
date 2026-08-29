@@ -9,6 +9,7 @@ import net.lunix.nixreaper.Ledger;
 import net.lunix.nixreaper.Messages;
 import net.lunix.nixreaper.NixReaper;
 import net.lunix.nixreaper.PurgeService;
+import net.lunix.nixreaper.Taunts;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -32,7 +33,7 @@ public final class NixReaperCommand {
                 .then(Commands.literal("info").executes(ctx -> info(ctx.getSource())))
                 .then(Commands.literal("status").executes(ctx -> selfStatus(ctx.getSource())))
                 .then(Commands.literal("admin")
-                        .requires(src -> NixReaper.hasBypass(src.permissions()))
+                        .requires(src -> NixReaper.canAdmin(src.permissions()))
                         .then(Commands.literal("config")
                                 .then(Commands.literal("list").executes(ctx -> configList(ctx.getSource())))
                                 .then(Commands.literal("get")
@@ -52,6 +53,13 @@ public final class NixReaperCommand {
                                         .executes(ctx -> status(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "player")))))
                         .then(Commands.literal("pardon")
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .executes(ctx -> pardon(ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "player")))))
+                        // Same command, thematic name. One behaviour, two ways to reach it --
+                        // an admin who thinks in the mod's vocabulary should not have to
+                        // remember it is spelled "pardon".
+                        .then(Commands.literal("resurrect")
                                 .then(Commands.argument("player", StringArgumentType.word())
                                         .executes(ctx -> pardon(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "player")))))
@@ -88,19 +96,36 @@ public final class NixReaperCommand {
             return 1;
         }
 
-        sb.append("§fWhen you die:\n");
-        if (c.wipePlayerData) sb.append("§7 - §cYour inventory, ender chest and XP are erased\n");
-        if (c.wipeAdvancements) sb.append("§7 - §cYour advancements and recipe book are erased\n");
-        if (c.wipeStats) sb.append("§7 - §cYour statistics are erased\n");
-        sb.append("§7 - §cNothing drops on the ground. There is no body to loot.\n");
-        sb.append("§f\nYou are then locked out for §e")
+        String stakes = Messages.stakes();
+        sb.append("§fWhen you die you are sent to §5Purgatory§f for §e")
           .append(Messages.humanize(c.lockoutMinutes * 60_000L)).append("§f.\n");
+        sb.append("§7You cannot rejoin until it ends. The clock is real time --\n");
+        sb.append("§7it keeps running while the server is offline.\n");
+
+        if (stakes != null) {
+            sb.append("§f\nTaken from you: §c").append(stakes).append("\n");
+            sb.append("§7Nothing drops on the ground. There is no body to loot.\n");
+        } else {
+            sb.append("§f\nNothing of yours is taken -- only your time.\n");
+        }
+
+        sb.append("§f\nYou leave Purgatory one of two ways:\n");
+        if (stakes != null) {
+            sb.append("§7 - §aResurrected§7 by an admin, within §e")
+              .append(Messages.humanize(c.wipeGraceMinutes * 60_000L))
+              .append("§7 -- you return exactly as you were\n");
+            sb.append("§7 - §5Reincarnated§7 when the time runs out -- you return with nothing\n");
+        } else {
+            sb.append("§7 - released early by an admin\n");
+            sb.append("§7 - or when the time runs out\n");
+        }
         sb.append("§7The death screen stays up for ").append(c.lockoutDeathScreenSeconds)
-          .append("s so you can see what killed you.\n");
-        sb.append("§7The countdown is real time -- it keeps running while the server is offline.\n");
-        sb.append("§f\nIf the death was not your fault, an admin has §e")
-          .append(Messages.humanize(c.wipeGraceMinutes * 60_000L))
-          .append("§f to pardon you and give it all back.");
+          .append("s so you can see what killed you.");
+        // Worth stating out loud on a server that has chosen it: the stakes are the same for
+        // everyone, which is exactly the thing players assume is untrue of the person running it.
+        if (c.bypassPermissionLevel < 0) {
+            sb.append("\n§7Nobody is exempt -- not even the server owner.");
+        }
         src.sendSuccess(() -> Component.literal(sb.toString()), false);
         return 1;
     }
@@ -116,8 +141,8 @@ public final class NixReaperCommand {
             src.sendSuccess(() -> Component.literal("§aYou are alive and clear. Nothing pending."), false);
         } else {
             long now = System.currentTimeMillis();
-            src.sendSuccess(() -> Component.literal("§eLockout: " + Messages.humanize(e.remainingMillis(now))
-                    + " remaining."), false);
+            src.sendSuccess(() -> Component.literal("§5Purgatory: §e" + Messages.humanize(e.remainingMillis(now))
+                    + "§f remaining."), false);
         }
         return 1;
     }
@@ -161,6 +186,7 @@ public final class NixReaperCommand {
     private static int reload(CommandSourceStack src) {
         Config.load();
         Ledger.load();
+        Taunts.load();
         // Re-run the startup checks so an admin who has just fixed server.properties gets
         // the mod back without a second restart -- and so one that has just been broken is
         // caught here rather than at the next death.
@@ -188,17 +214,17 @@ public final class NixReaperCommand {
             return 0;
         }
         if (Ledger.all().isEmpty()) {
-            src.sendSuccess(() -> Component.literal("§aNobody is locked out."), false);
+            src.sendSuccess(() -> Component.literal("§aNobody is in Purgatory."), false);
             return 1;
         }
-        StringBuilder sb = new StringBuilder("§6Locked out:");
+        StringBuilder sb = new StringBuilder("§6In Purgatory:");
         for (UUID uuid : Ledger.uuids()) {
             Ledger.Entry e = Ledger.get(uuid);
             if (e == null) continue;
             sb.append("\n§f").append(e.name)
               .append(" §7- ").append(Messages.humanize(e.remainingMillis(now))).append(" left")
               .append(e.restorable()
-                      ? " §e(restorable for " + Messages.humanize(e.graceRemainingMillis(now)) + ")"
+                      ? " §e(resurrectable for " + Messages.humanize(e.graceRemainingMillis(now)) + ")"
                       : " §8(purged)");
         }
         src.sendSuccess(() -> Component.literal(sb.toString()), false);
@@ -208,7 +234,7 @@ public final class NixReaperCommand {
     private static int status(CommandSourceStack src, String name) {
         UUID uuid = Ledger.findByName(name);
         if (uuid == null) {
-            src.sendSuccess(() -> Component.literal("§a" + name + " has no lockout."), false);
+            src.sendSuccess(() -> Component.literal("§a" + name + " is not in Purgatory."), false);
             return 1;
         }
         Ledger.Entry e = Ledger.get(uuid);
@@ -225,7 +251,7 @@ public final class NixReaperCommand {
         if (e.restorable()) {
             // Surfaced so an admin can see whether a pardon would still restore them.
             sb.append("\n§e grace: ").append(Messages.humanize(e.graceRemainingMillis(now)))
-              .append(" left -- pardon now restores everything");
+              .append(" left -- resurrection restores everything");
         } else {
             sb.append("\n§8 grace expired -- pardon only lifts the lockout");
         }
@@ -247,7 +273,7 @@ public final class NixReaperCommand {
     private static int pardon(CommandSourceStack src, String name) {
         UUID uuid = Ledger.findByName(name);
         if (uuid == null) {
-            src.sendFailure(Component.literal(name + " is not locked out."));
+            src.sendFailure(Component.literal(name + " is not in Purgatory."));
             return 0;
         }
         // No pardoning yourself. Otherwise the penalty is optional for anyone holding the
@@ -264,9 +290,13 @@ public final class NixReaperCommand {
         Ledger.Entry e = Ledger.get(uuid);
 
         if (!e.restorable()) {
+            // Released early rather than resurrected: they still come back with nothing, so
+            // they are owed the reincarnation greeting the same as anyone who served the term.
             Ledger.remove(uuid);
+            NixReaper.markReincarnated(uuid);
             src.sendSuccess(() -> Component.literal(
-                    "§ePardoned " + e.name + " -- lockout lifted, but data was already purged."), true);
+                    "§e" + e.name + " released from Purgatory -- too late to resurrect, "
+                    + "their Inventory, Ender Chest & XP are gone."), true);
             return 1;
         }
 
@@ -293,7 +323,7 @@ public final class NixReaperCommand {
         Ledger.put(uuid, e);
 
         src.sendSuccess(() -> Component.literal(
-                "§aPardoned " + e.name + " -- purge cancelled, data restored."), true);
+                "§a" + e.name + " resurrected -- Inventory, Ender Chest & XP restored."), true);
         return 1;
     }
 

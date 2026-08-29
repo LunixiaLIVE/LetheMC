@@ -30,7 +30,28 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HOST = os.environ.get("RCON_HOST", "127.0.0.1")
 PORT = int(os.environ.get("RCON_PORT", "25575"))
-PASSWORD = os.environ.get("RCON_PASSWORD", "changeme")
+
+
+def _password():
+    """Env var, else a 0600 file next to the server. Never a literal in argv.
+
+    Passing the password on a command line -- including as a `VAR=x cmd` prefix
+    over ssh -- leaks it into the process list, where any user on the box can
+    read it out of `ps`. Learned the hard way.
+    """
+    env = os.environ.get("RCON_PASSWORD")
+    if env:
+        return env
+    for candidate in (".rcon_pw", os.path.join(os.path.dirname(__file__), "..", ".rcon_pw")):
+        try:
+            with open(candidate, "r", encoding="utf8") as fh:
+                return fh.read().strip()
+        except OSError:
+            continue
+    return "changeme"
+
+
+PASSWORD = _password()
 
 LOGIN, COMMAND = 3, 2
 

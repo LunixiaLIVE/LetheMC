@@ -6,6 +6,7 @@
   "mixins": [
     "GameRulesMixin",
     "PlayerListMixin",
+    "ServerPlayerMixin",
     "ServerGamePacketListenerMixin"
   ],
   "injectors": {

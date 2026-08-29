@@ -56,20 +56,67 @@ public final class Config {
     public int lockoutDeathScreenSeconds = 15;
 
     // --- messages ---
+    // Does NOT claim the data is gone. At the moment this is shown the player has not even
+    // been entombed yet, and stays fully restorable for the whole grace period -- telling
+    // them otherwise is the same lie the rejoin message used to tell (DESIGN 10, bug 3).
+    // %grace_line% reports whichever is actually true.
     public String messageDeath =
-            "§cYou died. §7(%death_reason%)\n\n"
-            + "§fYou are locked out for §e%time_remaining%§f.\n"
-            + "§8Everything you owned has been erased.";
-    // Deliberately a countdown, not %unlock_time%: an absolute timestamp is rendered in the
-    // server's timezone, which is not the player's, and nothing on the screen says so.
+            "§c☠ You have died.\n§7%death_reason%\n\n"
+            + "§fYou are in §5Purgatory§f for §e%time_remaining%§f.\n\n"
+            + "%grace_line%";
+    // A duration, never %unlock_time%: an absolute timestamp is rendered in the server's
+    // timezone, which is not the player's, and nothing on the screen says so.
     public String messageRejoin =
-            "§c☠ You are still dead.\n\n"
-            + "§fUnlocks in §e%time_remaining_short%\n"
-            + "§8DD:HH:MM:SS§7 (§f%time_remaining%§7)\n\n"
+            "§5☠ You are in Purgatory\n\n"
+            + "§fYou may return in §e%time_remaining%\n\n"
             + "%grace_line%";
 
-    // --- misc ---
-    public int bypassPermissionLevel = 4;
+    /**
+     * Shown once, in chat, to a player returning from Purgatory with nothing.
+     * A random line from config/nixreaper/reincarnation.txt is appended.
+     */
+    public String messageReincarnation =
+            "§5You have been reincarnated. §7Nothing of your old life remains.";
+
+    /**
+     * The single line of the death screen a server can control (see ServerPlayerMixin).
+     * Must stay ONE line -- the score sits 15px below it and there is no wrapping.
+     * Set empty to leave vanilla's death message alone.
+     */
+    // "was sent" rather than "sent": vanilla death messages are all past tense and vary a
+    // lot ("drowned", "was slain by", "fell from a high place"), and the full verb is the
+    // only phrasing that reads correctly after every one of them.
+    public String messageDeathScreen = "%death_reason% §7& was sent to §5Purgatory";
+
+    // --- permissions ---
+    // Two separate questions that used to share one answer. Welding them together forced a
+    // false choice: an admin could either run /nr admin OR be able to die, never both -- so on
+    // a server built around death having stakes, the person running it was silently exempt.
+    //
+    // Also note bypass and admin have different legal ranges. "Nobody is exempt" is a sensible
+    // and desirable setting; "nobody can administer" is not, so -1 is only offered for bypass.
+
+    /**
+     * Who is exempt from dying.
+     *
+     * <p>{@code -1} nobody (the default -- everyone faces Purgatory, including the owner),
+     * {@code 0} everyone (equivalent to switching the mod off), {@code 1-4} that op permission
+     * and above.
+     *
+     * <p>Defaults to -1 deliberately. An existing config already has this key written out and
+     * keeps whatever it says, so upgrading servers are unaffected; only fresh installs get the
+     * stricter default.
+     */
+    public int bypassPermissionLevel = -1;
+
+    /**
+     * Who can run {@code /nr admin ...}. {@code 0-4}, default 4.
+     *
+     * <p>With the defaults you can resurrect other people and still die yourself, which is what
+     * makes the self-pardon guard meaningful -- previously anyone who could pardon was immune
+     * to ever needing it.
+     */
+    public int adminPermissionLevel = 4;
 
     private static Config INSTANCE = new Config();
 
@@ -95,8 +142,11 @@ public final class Config {
         }
         if (lockoutDeathScreenSeconds < 0) return "lockout.deathScreenSeconds cannot be negative.";
         if (wipeGraceMinutes < 1) return "wipe.graceMinutes must be at least 1.";
-        if (bypassPermissionLevel < 0 || bypassPermissionLevel > 4) {
-            return "bypass.permissionLevel must be 0-4.";
+        if (bypassPermissionLevel < -1 || bypassPermissionLevel > 4) {
+            return "bypass.permissionLevel must be -1 (nobody exempt), 0 (everyone) or 1-4.";
+        }
+        if (adminPermissionLevel < 0 || adminPermissionLevel > 4) {
+            return "admin.permissionLevel must be 0-4.";
         }
         return null;
     }
@@ -116,7 +166,10 @@ public final class Config {
         m.put("lockout.deathScreenSeconds", String.valueOf(lockoutDeathScreenSeconds));
         m.put("message.death", messageDeath);
         m.put("message.rejoin", messageRejoin);
+        m.put("message.deathScreen", messageDeathScreen);
+        m.put("message.reincarnation", messageReincarnation);
         m.put("bypass.permissionLevel", String.valueOf(bypassPermissionLevel));
+        m.put("admin.permissionLevel", String.valueOf(adminPermissionLevel));
         return m;
     }
 
@@ -145,7 +198,10 @@ public final class Config {
                 case "lockout.deathScreenSeconds" -> c.lockoutDeathScreenSeconds = Integer.parseInt(value);
                 case "message.death" -> c.messageDeath = value;
                 case "message.rejoin" -> c.messageRejoin = value;
+                case "message.deathScreen" -> c.messageDeathScreen = value;
+                case "message.reincarnation" -> c.messageReincarnation = value;
                 case "bypass.permissionLevel" -> c.bypassPermissionLevel = Integer.parseInt(value);
+                case "admin.permissionLevel" -> c.adminPermissionLevel = Integer.parseInt(value);
                 default -> {
                     return "Unknown key: " + key;
                 }
@@ -186,7 +242,10 @@ public final class Config {
         c.lockoutDeathScreenSeconds = lockoutDeathScreenSeconds;
         c.messageDeath = messageDeath;
         c.messageRejoin = messageRejoin;
+        c.messageDeathScreen = messageDeathScreen;
+        c.messageReincarnation = messageReincarnation;
         c.bypassPermissionLevel = bypassPermissionLevel;
+        c.adminPermissionLevel = adminPermissionLevel;
     }
 
     // ------------------------------------------------------------------
