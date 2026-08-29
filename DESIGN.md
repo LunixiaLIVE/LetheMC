@@ -276,6 +276,26 @@ Each entombed file is held open under an exclusive `FileLock` for the whole grac
 >
 > **The real protection on Linux is the move**: the file is no longer at any path another process would think to look at. The lock is defence in depth, not the defence. A lock that cannot be taken is therefore logged and shrugged off, never fatal.
 
+**Considered and rejected: defaulting this off on Linux.** Since the lock buys nothing there,
+holding it looks like pure overhead -- so the overhead was measured rather than assumed. The
+server holds ~180 file descriptors against a limit of 524,288, and the lock costs 4 more per
+entombed player for the length of the grace period only. Roughly 131,000 players would have to
+die inside a single grace window to exhaust it.
+
+So the setting is dead weight on Linux, not a cost. Flipping the default per-platform would buy
+four descriptors out of half a million while introducing a behavioural difference between a
+Windows and a Linux server that someone eventually has to debug. Left alone deliberately.
+
+The measurement's real value is the reminder that **the move, not the lock, is what protects the
+purge on Linux** -- so the advisory-lock finding is not a defect waiting on a heavier fix.
+Wrapping this in `flock`, or mounting with mandatory locking, would be solving a problem that
+does not exist.
+
+> The key name misleads. Every sibling in the `wipe.` namespace names something that gets wiped
+> -- `wipe.playerData`, `wipe.advancements`, `wipe.pets` -- so `wipe.lockFiles` reads as "wipe
+> the lock files" rather than "lock the files". Observed live: the author misread his own key.
+> Not renamed, because the confusion is cosmetic and a rename costs a migration.
+
 Locks must be released before any move or delete — on Windows a file this process holds open cannot be deleted, so skipping the release turns every hard delete into an `AccessDeniedException`. Released explicitly on `SERVER_STOPPING` rather than relying on process exit.
 
 ### 4.10 Pardon must survive the respawn (**J**) — found in testing
