@@ -14,7 +14,12 @@
     "MountMenuWardMixin",
     "FoxMixin",
     "FoxAccessor",
-    "ServerGamePacketListenerMixin"
+    "ServerGamePacketListenerMixin",
+    "VaultServerDataMixin",
+    "VaultBlockEntityMixin",
+    "GossipContainerMixin",
+    "VillagerMixin",
+    "BlockEntityAttachMixin"
   ],
   "injectors": {
     "defaultRequire": 1

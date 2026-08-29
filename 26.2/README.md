@@ -118,6 +118,37 @@ give back.
 Animals tamed *before* this feature was installed are never touched, so adding the mod to an
 existing world does not cull everyone's pets.
 
+### The world remembers you too
+
+Your player files are not the only place your name is kept. Three things out in the world record
+it against your UUID, and all three outlive a purge unless nixReaper deals with them.
+
+**Trial vaults forget you.** A vault you emptied in a past life opens again. This is the only one
+that *costs* you something rather than granting it — without it a reincarnated player walks up to
+a vault they have never opened in this life and is silently refused, with nothing on screen to
+explain why.
+
+**Villagers forget what they thought of you.** Trade discounts earned before a death do not
+follow you into a life that did nothing to earn them.
+
+**Villagers you alone traded with are destroyed.** A private trading hall — villagers one player
+cured, bred and levelled, that nobody else has ever used — is that player's work as surely as a
+loaded chest donkey is their stash. Left standing it waits, fully stocked, for their next life.
+
+> ⚠️ **`wipe.villagers` is the most destructive setting in this mod.** It removes world content
+> rather than a player's belongings, and it cannot be undone. Set it to `false` if that is not
+> what you want.
+
+Three rules keep it from emptying your village:
+
+- **Only villagers you actually dealt with count.** A trade, a cure, a thrown punch. Gossip
+  spreads between villagers on its own, so they hear about players they have never met —
+  destroying on reputation alone would ripple outwards through a village as the news travelled.
+- **Any living customer spares the villager**, whether they are online or not. A hall shared with
+  someone who is still alive keeps working for them.
+- **Villagers bred and left alone are never touched**, and neither is anyone you traded with
+  before installing the mod.
+
 ---
 
 ## Commands
@@ -195,6 +226,9 @@ with `/nr admin config set`.
 | `wipe.pets` | `true` | Destroy tamed wolves, cats and parrots on reincarnation |
 | `wipe.livestock` | `true` | Destroy tamed horses, donkeys, mules, llamas and camels — **and their cargo** |
 | `wipe.foxes` | `true` | Make foxes forget they trusted you, and destroy those no living player trusts |
+| `wipe.vaultRewards` | `true` | Trial vaults forget that a past life looted them |
+| `wipe.villagerReputation` | `true` | Villagers forget what they thought of a past life |
+| `wipe.villagers` | `true` | Destroy villagers whose only customers have died — **see the warning below** |
 | `wipe.petsCheckIntervalTicks` | `20` | How often to look for animals belonging to an ended life |
 | `lockout.minutes` | `360` | Lockout length in real-time minutes (6 hours) |
 | `lockout.deathScreenSeconds` | `15` | How long the death screen is held |
@@ -249,10 +283,8 @@ saying so. `%unlock_time%` is still available if you want it — it just isn't u
   loads that chunk, so there is no world scan and no startup cost.
 - **Scoreboard scores and teams survive.** Vanilla keys those by player *name* in a single
   shared file, so removing one player's entries is not something this mod attempts.
-- **Villager reputation and trial-vault rewards survive.** Both are stored against your UUID out
-  in the world — on each villager, and in each vault — rather than in your player files. A
-  reincarnated player keeps their trade discounts, and still cannot re-loot a vault they cleared
-  in a previous life.
+- **Scoreboards are keyed by player *name*, not UUID**, in one shared file — so they are usually
+  the server's own machinery (ranks, minigames) rather than player progress, and are left alone.
 - **Other mods' data survives.** Anything storing its own per-player records is untouched.
 
 ## License

@@ -67,6 +67,37 @@ public final class Config {
     public boolean wipeFoxes = true;
 
     /**
+     * Trial vaults forget that a past life already looted them.
+     *
+     * <p>The only entry on the list of things that outlive a purge which <em>costs</em> the
+     * player rather than granting them something: without this a reincarnated player is
+     * silently refused by a vault they have never opened in this life.
+     */
+    public boolean wipeVaultRewards = true;
+
+    /**
+     * Villagers forget what they thought of a past life.
+     *
+     * <p>Reputation is stored against your UUID on each villager, so trade discounts earned
+     * before a death would otherwise follow you into a life that did nothing to earn them.
+     */
+    public boolean wipeVillagerReputation = true;
+
+    /**
+     * Destroy villagers whose only customers belong to lives that have ended.
+     *
+     * <p>Aimed at the private trading hall: villagers one player cured, bred and levelled, which
+     * would otherwise stand fully stocked waiting for their next life. Only villagers actually
+     * dealt with count -- gossip spreads by itself, and destroying on hearsay would empty a
+     * village outward from the people who died in it.
+     *
+     * <p><b>The most destructive setting in this file.</b> It removes world content rather than
+     * a player's belongings, and on a shared server a hall used by one player who dies is gone
+     * for good. Any living customer spares a villager.
+     */
+    public boolean wipeVillagers = true;
+
+    /**
      * How often to look for animals belonging to an ended life, in ticks.
      *
      * <p>Deliberately frequent. The exploit is short-range: park a loaded donkey at spawn,
@@ -189,6 +220,9 @@ public final class Config {
         m.put("wipe.pets", String.valueOf(wipePets));
         m.put("wipe.livestock", String.valueOf(wipeLivestock));
         m.put("wipe.foxes", String.valueOf(wipeFoxes));
+        m.put("wipe.vaultRewards", String.valueOf(wipeVaultRewards));
+        m.put("wipe.villagerReputation", String.valueOf(wipeVillagerReputation));
+        m.put("wipe.villagers", String.valueOf(wipeVillagers));
         m.put("wipe.petsCheckIntervalTicks", String.valueOf(petsCheckIntervalTicks));
         m.put("lockout.minutes", String.valueOf(lockoutMinutes));
         m.put("lockout.deathScreenSeconds", String.valueOf(lockoutDeathScreenSeconds));
@@ -225,6 +259,9 @@ public final class Config {
                 case "wipe.pets" -> c.wipePets = parseBool(value);
                 case "wipe.livestock" -> c.wipeLivestock = parseBool(value);
                 case "wipe.foxes" -> c.wipeFoxes = parseBool(value);
+                case "wipe.vaultRewards" -> c.wipeVaultRewards = parseBool(value);
+                case "wipe.villagerReputation" -> c.wipeVillagerReputation = parseBool(value);
+                case "wipe.villagers" -> c.wipeVillagers = parseBool(value);
                 case "wipe.petsCheckIntervalTicks" -> c.petsCheckIntervalTicks = Integer.parseInt(value);
                 case "lockout.minutes" -> c.lockoutMinutes = Integer.parseInt(value);
                 case "lockout.deathScreenSeconds" -> c.lockoutDeathScreenSeconds = Integer.parseInt(value);
@@ -273,6 +310,9 @@ public final class Config {
         c.wipePets = wipePets;
         c.wipeLivestock = wipeLivestock;
         c.wipeFoxes = wipeFoxes;
+        c.wipeVaultRewards = wipeVaultRewards;
+        c.wipeVillagerReputation = wipeVillagerReputation;
+        c.wipeVillagers = wipeVillagers;
         c.petsCheckIntervalTicks = petsCheckIntervalTicks;
         c.lockoutMinutes = lockoutMinutes;
         c.lockoutDeathScreenSeconds = lockoutDeathScreenSeconds;

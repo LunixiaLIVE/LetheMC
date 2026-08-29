@@ -11,9 +11,11 @@ import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.animal.equine.AbstractHorse;
 import net.minecraft.world.entity.animal.fox.Fox;
+import net.minecraft.world.entity.npc.villager.Villager;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -268,6 +270,49 @@ public final class Pets {
     }
 
     /**
+     * A villager whose only customers are dead is destroyed.
+     *
+     * <p>The case this exists for is a trading hall far from anywhere: one player cured, bred
+     * and levelled every villager in it, and nobody else has ever opened a trade. Those
+     * villagers are that player's work as surely as a chest donkey is their stash, and letting
+     * them stand through a death leaves the hall waiting, fully levelled, for the next life.
+     *
+     * <p><b>Only villagers dealt with face to face are eligible</b> -- see {@link DirectlyKnown}.
+     * Gossip spreads on its own, so villagers hear about players they never met; destroying on
+     * reputation alone would ripple outwards through a village as the news travelled and take
+     * bystanders with it. One that was merely bred and left alone has dealt with nobody, so
+     * nothing here can touch it.
+     *
+     * <p>Any customer still living spares the villager entirely, exactly as a fox is spared by a
+     * surviving trustee. A shared village keeps working for the people still alive to use it.
+     */
+    private static void checkVillager(Villager villager) {
+        if (!Config.get().wipeVillagers) return;
+        Object gossips = villager.getGossips();
+        if (!(gossips instanceof DirectlyKnown known) || !(gossips instanceof LifeStamped stamped)) return;
+
+        Set<UUID> direct = known.nixreaper$direct();
+        if (direct.isEmpty()) return; // never dealt with anyone -- bred and left alone
+
+        Map<UUID, String> stamps = stamped.nixreaper$stamps();
+        boolean anyEnded = false;
+        for (UUID customer : direct) {
+            // No stamp means the dealing predates this feature. Never act on what we cannot date.
+            if (stamps.get(customer) == null) return;
+            if (Stamps.isStale(customer, stamps)) {
+                anyEnded = true;
+            } else {
+                return; // somebody living still trades here
+            }
+        }
+        if (!anyEnded) return;
+
+        NixReaper.LOGGER.info("Removing villager at {} -- everyone who traded here is gone",
+                villager.blockPosition().toShortString());
+        villager.discard();
+    }
+
+    /**
      * The periodic sweep.
      *
      * <p>Runs often on purpose. The loophole it closes is short-range -- park a loaded animal
@@ -276,11 +321,15 @@ public final class Pets {
      */
     public static void sweep(MinecraftServer server) {
         Config c = Config.get();
-        if (!c.wipePets && !c.wipeLivestock && !c.wipeFoxes) return;
+        if (!c.wipePets && !c.wipeLivestock && !c.wipeFoxes && !c.wipeVillagers) return;
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity e : level.getAllEntities()) {
                 if (e instanceof Fox fox) {
                     checkFox(fox);
+                    continue;
+                }
+                if (e instanceof Villager villager) {
+                    checkVillager(villager);
                     continue;
                 }
                 if (isWarded(e)) ejectRiders(e);
