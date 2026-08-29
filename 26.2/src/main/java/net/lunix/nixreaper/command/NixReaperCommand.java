@@ -345,6 +345,7 @@ public final class NixReaperCommand {
         if (ok) {
             e.wipePending = false;
             Ledger.put(uuid, e);
+            NixReaper.onRemainsDestroyed(uuid);
             src.sendSuccess(() -> Component.literal(
                     "§aPurged " + e.name + " -- grace period skipped, nothing left to restore."), true);
             return 1;

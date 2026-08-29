@@ -117,6 +117,7 @@ public class NixReaper implements ModInitializer {
             }
 
             Taunts.load();
+            Incarnations.load();
             recover(s);
             LOGGER.info("nixReaper ready -- lockout {} min, grace {} min",
                     Config.get().lockoutMinutes, Config.get().wipeGraceMinutes);
@@ -386,6 +387,11 @@ public class NixReaper implements ModInitializer {
         // 0. Respawn pardoned players who logged back in dead.
         runAutoRespawns(s);
 
+        // 0b. Free animals whose owner is living a different life now.
+        if (s.getTickCount() % Math.max(1, cfg.petsCheckIntervalTicks) == 0) {
+            Pets.sweep(s);
+        }
+
         // 1. Kick anyone whose death screen has run its course.
         long holdMillis = cfg.lockoutDeathScreenSeconds * 1000L;
         for (ServerPlayer player : s.getPlayerList().getPlayers().toArray(new ServerPlayer[0])) {
@@ -413,6 +419,7 @@ public class NixReaper implements ModInitializer {
             if (Graveyard.destroy(s, uuid, e.name)) {
                 e.wipePending = false;
                 Ledger.put(uuid, e);
+                onRemainsDestroyed(uuid);
             } else {
                 // Retry rather than dropping the obligation. The locks we hold mean this
                 // should be unreachable on Windows, which is where it used to happen.
@@ -432,11 +439,36 @@ public class NixReaper implements ModInitializer {
                 // would reach checkLogin with nothing to read and never be greeted.
                 if (e.dataState() == Ledger.DataState.ERASED || !e.restorable()) {
                     AWAITING_REINCARNATION.add(uuid);
+                    // Normally the incarnation was already rotated when the remains were
+                    // destroyed, which is the earlier and more important moment -- it is what
+                    // stops a friend emptying someone's chest donkey while they are locked
+                    // out. Only rotate here if that never happened: entombment failed, or the
+                    // wipe was disabled, so this is the first point the old life truly ends.
+                    if (!e.entombed()) {
+                        Incarnations.rotate(uuid);
+                    }
                 }
                 Ledger.remove(uuid);
                 LOGGER.info("{} left Purgatory -- reincarnated", e.name);
             }
         }
+    }
+
+    /**
+     * The remains are gone for good. Ends the old life at that same instant.
+     *
+     * <p>Rotating here rather than only when Purgatory expires closes a window. Between the
+     * hard delete and the lockout ending, a player is offline for potentially hours while
+     * their tamed animals are still theirs -- long enough for a friend to empty their chest
+     * donkey and hand it all back afterwards, which is precisely the loophole that destroying
+     * the animals exists to shut. Once the belongings are destroyed, everything of that life
+     * goes together.
+     *
+     * <p>Deliberately NOT called on resurrection: that cancels the destruction, so the life
+     * continues and the animals stay theirs.
+     */
+    public static void onRemainsDestroyed(UUID uuid) {
+        Incarnations.rotate(uuid);
     }
 
     /**
@@ -486,6 +518,7 @@ public class NixReaper implements ModInitializer {
                 if (Graveyard.destroy(s, uuid, e.name)) {
                     e.wipePending = false;
                     Ledger.put(uuid, e);
+                    onRemainsDestroyed(uuid);
                 }
             }
         }
@@ -713,6 +746,7 @@ public class NixReaper implements ModInitializer {
             }
             e.wipePending = false;
             Ledger.put(uuid, e);
+            onRemainsDestroyed(uuid);
         }
 
         // Coming back with nothing -- that is a reincarnation, and it should be said out

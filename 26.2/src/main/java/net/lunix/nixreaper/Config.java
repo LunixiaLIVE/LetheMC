@@ -51,6 +51,29 @@ public final class Config {
      */
     public boolean wipeLockFiles = true;
 
+    // --- what a reincarnation frees ---
+    // Grouped by how Minecraft models ownership, because that is what actually differs:
+    // TamableAnimal (sit/tame flags), AbstractHorse (its own tame + inventory), and Fox
+    // (two independent trust slots). One toggle each, since a server may well want loyal
+    // horses but forgetful wolves.
+
+    /** Wolves, cats, parrots. */
+    public boolean wipePets = true;
+
+    /** Horses, donkeys, mules, llamas, camels -- including whatever is in their chest. */
+    public boolean wipeLivestock = true;
+
+    /** Foxes, which trust rather than obey. */
+    public boolean wipeFoxes = true;
+
+    /**
+     * How often to look for animals belonging to an ended life, in ticks.
+     *
+     * <p>Deliberately frequent. The exploit is short-range: park a loaded donkey at spawn,
+     * die, and collect it on the walk back. A slow sweep leaves a window where that works.
+     */
+    public int petsCheckIntervalTicks = 20;
+
     // --- lockout ---
     public int lockoutMinutes = 360;
     public int lockoutDeathScreenSeconds = 15;
@@ -142,6 +165,7 @@ public final class Config {
         }
         if (lockoutDeathScreenSeconds < 0) return "lockout.deathScreenSeconds cannot be negative.";
         if (wipeGraceMinutes < 1) return "wipe.graceMinutes must be at least 1.";
+        if (petsCheckIntervalTicks < 1) return "wipe.petsCheckIntervalTicks must be at least 1.";
         if (bypassPermissionLevel < -1 || bypassPermissionLevel > 4) {
             return "bypass.permissionLevel must be -1 (nobody exempt), 0 (everyone) or 1-4.";
         }
@@ -162,6 +186,10 @@ public final class Config {
         m.put("wipe.stats", String.valueOf(wipeStats));
         m.put("wipe.graceMinutes", String.valueOf(wipeGraceMinutes));
         m.put("wipe.lockFiles", String.valueOf(wipeLockFiles));
+        m.put("wipe.pets", String.valueOf(wipePets));
+        m.put("wipe.livestock", String.valueOf(wipeLivestock));
+        m.put("wipe.foxes", String.valueOf(wipeFoxes));
+        m.put("wipe.petsCheckIntervalTicks", String.valueOf(petsCheckIntervalTicks));
         m.put("lockout.minutes", String.valueOf(lockoutMinutes));
         m.put("lockout.deathScreenSeconds", String.valueOf(lockoutDeathScreenSeconds));
         m.put("message.death", messageDeath);
@@ -194,6 +222,10 @@ public final class Config {
                 case "wipe.stats" -> c.wipeStats = parseBool(value);
                 case "wipe.graceMinutes" -> c.wipeGraceMinutes = Integer.parseInt(value);
                 case "wipe.lockFiles" -> c.wipeLockFiles = parseBool(value);
+                case "wipe.pets" -> c.wipePets = parseBool(value);
+                case "wipe.livestock" -> c.wipeLivestock = parseBool(value);
+                case "wipe.foxes" -> c.wipeFoxes = parseBool(value);
+                case "wipe.petsCheckIntervalTicks" -> c.petsCheckIntervalTicks = Integer.parseInt(value);
                 case "lockout.minutes" -> c.lockoutMinutes = Integer.parseInt(value);
                 case "lockout.deathScreenSeconds" -> c.lockoutDeathScreenSeconds = Integer.parseInt(value);
                 case "message.death" -> c.messageDeath = value;
@@ -238,6 +270,10 @@ public final class Config {
         c.wipeStats = wipeStats;
         c.wipeGraceMinutes = wipeGraceMinutes;
         c.wipeLockFiles = wipeLockFiles;
+        c.wipePets = wipePets;
+        c.wipeLivestock = wipeLivestock;
+        c.wipeFoxes = wipeFoxes;
+        c.petsCheckIntervalTicks = petsCheckIntervalTicks;
         c.lockoutMinutes = lockoutMinutes;
         c.lockoutDeathScreenSeconds = lockoutDeathScreenSeconds;
         c.messageDeath = messageDeath;
