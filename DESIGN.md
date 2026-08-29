@@ -892,3 +892,83 @@ with nothing to explain why.
 
 Other mods storing their own per-player data are untouched by any of this.
 
+## 12. What the world remembers
+
+Player files are not the only place a UUID is kept. A sweep of the 26.2 bytecode for classes that
+persist player UUIDs turned up six, of which three were worth acting on.
+
+| Record | Where | Verdict |
+|---|---|---|
+| `VaultServerData.rewardedPlayers` | `Set<UUID>` on each vault | **handled** |
+| `GossipContainer.gossips` | `Map<UUID, EntityGossips>` on each villager | **handled** |
+| villagers themselves | the trading hall problem | **handled** |
+| `Scoreboard.playerScores` | one shared file, keyed by **name** | left alone -- reachable, but usually the server's own machinery |
+| `CustomBossEvent.players` | `Set<UUID>` in level.dat | left alone -- admin configuration |
+| `AngerManagement.angerByUuid`, `Raid.heroesOfTheVillage` | warden / raid state | left alone -- both expire on their own |
+
+Vanilla already clears neutral-mob anger via `NeutralMob.playerDied`, so that needed nothing.
+`ThrownEnderpearl.findOwnerIncludingDeadPlayer` deliberately keeps a pearl bound to a dead
+player, which is a genuine cross-life link and left as a curiosity.
+
+### 12.1 Vaults: purge the set, not the answer
+
+The vault asks whether a player is rewarded in two places, and only one of them can usefully be
+intercepted. `tryInsertKey` calls `hasRewardedPlayer`; `VaultSharedData` calls
+`getRewardedPlayers().contains(uuid)` to decide who counts as a nearby player at all. The second
+runs first, and a rewarded player is not "connected", so the vault stays `inactive` and
+`tryInsertKey` bails at its very first check -- `canEjectReward(config, state)` -- long before the
+reward check is reached.
+
+Overriding the answer to `hasRewardedPlayer` therefore changed nothing observable. **Found by
+testing; reading the method name alone would never have shown it.** Both paths read the same set,
+so the purge happens there. Removing the UUID also keeps vanilla's 128-entry cap honest -- dead
+entries would push live ones out.
+
+### 12.2 The null field that made a feature unliftable
+
+`VaultBlockEntity.serverData` is **null while `loadAdditional` runs**: the field is assigned in
+the constructor after `super()`. Decoding stamps straight into it silently dropped them, and the
+next save wrote the empty map back, erasing them from disk as well.
+
+The failure mode was worse than losing the feature. With no stamp nothing is judged stale, so a
+vault that survived one restart barred its looters **permanently** -- the exact penalty this
+exists to lift, made unliftable. It passed every test because no test restarted between looting
+and checking.
+
+Load now parks the raw string; `BlockEntity.setLevel` flushes it once the object exists. That
+hook is on the base class because `setLevel` is *inherited*, and Mixin cannot target an inherited
+method through a subclass -- it fails outright and took the server down, which is how it was
+found.
+
+> Two lessons, both already in §10 and both re-earned here. **`data get block` serialises the
+> block entity from memory on demand**, so seeing a tag there proves it is in RAM, not that it
+> ever reached disk -- the region file had to be read directly. And after theorising the cause
+> twice and being wrong twice, one log line answered it immediately.
+
+### 12.3 Villagers: hearsay must not be fatal
+
+Reputation is answered on read rather than swept -- `getReputation` is the single path, and
+sweeping would rebuild a map per villager per sweep. Stale reputation reads as zero.
+
+**Stale gossip is dropped before new gossip is recorded.** Reporting zero while leaving the entry
+in place meant the next trade re-dated it and handed a whole past life's standing back: 23 points
+restored for one wheat sold.
+
+Destruction is reserved for the private trading hall -- villagers one player cured, bred and
+levelled, otherwise waiting fully stocked for their next life. It is gated on **direct dealings
+only**, tracked separately from the stamps:
+
+`GossipContainer.transferFrom` merges straight into the entry map and never calls `add`, so
+`add` is the mark of a real encounter -- a trade, a cure, a punch. Gossip spreads on its own, and
+destroying on reputation alone would ripple outward through a village as the news travelled,
+taking villagers the player never met. Stamps still travel with transferred gossip, because a
+dead life's reputation must read as nothing wherever it lands; only the *destruction* stays local.
+
+Any living customer spares the villager, **online or not** -- the check reads `incarnations.json`,
+never the player list.
+
+> `wipe.villagers` is the most destructive setting in the mod: it removes world content rather
+> than belongings, and on a shared server a hall used by one player who dies is gone for good.
+> Default `true` was a deliberate call, on the grounds that a hall is built work in the same
+> sense a loaded chest donkey is a stash.
+
