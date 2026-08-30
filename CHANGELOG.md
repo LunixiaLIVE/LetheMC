@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0.1
+
+- **Stands down in single player.** NeoForge has no way to declare a mod server-only in its
+  metadata, so the jar loaded into single-player worlds and ran there in full — where a death
+  would shut a player out of their own save with no admin able to let them back in. Fabric was
+  already safe; the two now behave the same.
+
 ## 0.2.0.0 — first public release
 
 Death takes everything you own and sends you to Purgatory. An admin can resurrect you inside a
@@ -54,7 +61,7 @@ defend it, and a resurrection is supposed to give it all back intact.
 ### Requirements
 
 - **Fabric or NeoForge**, Minecraft 26.1.x or 26.2.x — one jar per minor line.
-- **Server-side only.** Players install nothing; a vanilla client just connects.
+- **Dedicated servers only.** Players install nothing; a vanilla client just connects.
 - **Java 25.**
 - `pause-when-empty-seconds=0`. A paused server stops ticking exactly when a dying player has
   left, so the wipe would silently never happen — LetheMC refuses to run rather than half-work.
