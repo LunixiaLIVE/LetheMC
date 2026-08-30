@@ -959,7 +959,15 @@ levelled, otherwise waiting fully stocked for their next life. It is gated on **
 only**, tracked separately from the stamps:
 
 `GossipContainer.transferFrom` merges straight into the entry map and never calls `add`, so
-`add` is the mark of a real encounter -- a trade, a cure, a punch. Gossip spreads on its own, and
+`add` is the mark of a real encounter. But not every encounter counts: `onReputationEventFrom`
+routes **all five** reputation events through it -- `TRADE` and `ZOMBIE_VILLAGER_CURED`, but also
+`VILLAGER_HURT`, `VILLAGER_KILLED` and `GOLEM_KILLED`.
+
+Counting the hostile ones inverted the feature. A stranger who wandered in, punched a villager
+nobody had traded with, and later died would take that villager with him -- the mod destroying
+someone else's property on behalf of a griefer. Only the positive events mark a customer now.
+Every event is still *stamped*, so a past life's grudges expire alongside its discounts: a player
+who returns as no one should not be remembered for an assault by someone who no longer exists. Gossip spreads on its own, and
 destroying on reputation alone would ripple outward through a village as the news travelled,
 taking villagers the player never met. Stamps still travel with transferred gossip, because a
 dead life's reputation must read as nothing wherever it lands; only the *destruction* stays local.

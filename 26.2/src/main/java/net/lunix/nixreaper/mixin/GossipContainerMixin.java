@@ -58,6 +58,8 @@ public abstract class GossipContainerMixin implements LifeStamped, DirectlyKnown
 
     @Shadow public abstract void remove(UUID player, GossipType type);
 
+    @Shadow public abstract java.util.Map<UUID, it.unimi.dsi.fastutil.objects.Object2IntMap<GossipType>> getGossipEntries();
+
     /**
      * Any opinion formed about a player is dated to the life they are living now -- and a life
      * that has ended has its opinions dropped first.
@@ -80,12 +82,23 @@ public abstract class GossipContainerMixin implements LifeStamped, DirectlyKnown
                 remove(player, t);
             }
         }
+        // Every type is stamped, negatives included: a reincarnated player returns as no one,
+        // so a villager should no more remember a grudge from an ended life than a discount.
         Stamps.mark(player, nixreaper$stamps);
 
-        // Only reached on a real encounter. Gossip arriving from another villager merges
-        // straight into the entry map without ever calling this method, which is precisely
-        // what keeps hearsay from marking a villager for destruction.
-        nixreaper$direct.add(player);
+        // But only what a player BUILT counts as being their customer. Vanilla routes all five
+        // reputation events through here -- trading and curing, but also hurting a villager,
+        // killing one, and killing a golem. Counting the hostile ones would invert the feature:
+        // a stranger who punched a villager in someone else's village and later died would take
+        // that villager with them, having never traded with it once.
+        //
+        // Gossip arriving from another villager never reaches this method at all -- transferFrom
+        // merges straight into the entry map -- so hearsay cannot mark a villager either.
+        if (type == GossipType.TRADING
+                || type == GossipType.MAJOR_POSITIVE
+                || type == GossipType.MINOR_POSITIVE) {
+            nixreaper$direct.add(player);
+        }
     }
 
     /** A past life's reputation reads as nothing at all. */
@@ -110,8 +123,14 @@ public abstract class GossipContainerMixin implements LifeStamped, DirectlyKnown
     private void nixreaper$carryStamps(GossipContainer other, RandomSource random, int count,
                                        CallbackInfo ci) {
         if (!(other instanceof LifeStamped source)) return;
-        for (Map.Entry<UUID, String> e : source.nixreaper$stamps().entrySet()) {
-            nixreaper$stamps.putIfAbsent(e.getKey(), e.getValue());
+
+        // Only for players this villager now actually holds an opinion about. Copying the
+        // source's whole map instead left villagers carrying stamps for players whose gossip
+        // never arrived, so every villager in a village slowly collected one entry per player.
+        Map<UUID, String> theirs = source.nixreaper$stamps();
+        for (UUID heard : getGossipEntries().keySet()) {
+            String stamp = theirs.get(heard);
+            if (stamp != null) nixreaper$stamps.putIfAbsent(heard, stamp);
         }
     }
 }

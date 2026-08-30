@@ -141,9 +141,11 @@ loaded chest donkey is their stash. Left standing it waits, fully stocked, for t
 
 Three rules keep it from emptying your village:
 
-- **Only villagers you actually dealt with count.** A trade, a cure, a thrown punch. Gossip
-  spreads between villagers on its own, so they hear about players they have never met —
-  destroying on reputation alone would ripple outwards through a village as the news travelled.
+- **Only villagers you built up count** — trading with one, or curing it. Hitting a villager
+  does *not* make it yours, so a stranger who punches your villagers and then dies cannot take
+  them with him. Gossip also spreads between villagers on its own, so they hear about players
+  they have never met; destroying on reputation alone would ripple outwards through a village
+  as the news travelled.
 - **Any living customer spares the villager**, whether they are online or not. A hall shared with
   someone who is still alive keeps working for them.
 - **Villagers bred and left alone are never touched**, and neither is anyone you traded with
