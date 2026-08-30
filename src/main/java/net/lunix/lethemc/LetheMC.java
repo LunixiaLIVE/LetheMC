@@ -151,6 +151,9 @@ public class LetheMC implements ModInitializer {
         });
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, s) -> {
+            // Before the stand-down check: an admin joining a disabled server still wants to
+            // know its world and its properties disagree.
+            warnAdminOfHardcoreMismatch(handler.getPlayer());
             if (standingDown) return;
             greetReincarnated(handler.getPlayer());
             retirePardonIfAlive(handler.getPlayer());
@@ -212,25 +215,71 @@ public class LetheMC implements ModInitializer {
      * <p>So it is a recommendation, said once, where an admin will see it.
      */
     private static void noteHardcore(MinecraftServer s) {
-        if (s.isHardcore()) return;
-        // Silent unless the admin actually asked for hardcore. A server that never wanted it
-        // does not need telling, and a note that fires for everyone is a note nobody reads.
-        if (!(s instanceof DedicatedServer ds) || !ds.getProperties().hardcore) return;
+        int m = hardcoreMismatch(s);
+        if (m == 0) return;
 
         LOGGER.warn("+----------------------------------------------------------------+");
-        LOGGER.warn("|  server.properties says hardcore=true, but this world is not.  |");
-        LOGGER.warn("+----------------------------------------------------------------+");
-        LOGGER.warn("  Hardcore is written into level.dat when a world is CREATED. Setting");
-        LOGGER.warn("  it afterwards does nothing -- vanilla ignores the property for a world");
-        LOGGER.warn("  that already exists, and says nothing about it. Your world is still");
-        LOGGER.warn("  in survival: no hardened hearts, and difficulty is not locked to Hard.");
+        if (m > 0) {
+            LOGGER.warn("|  server.properties says hardcore=true, but this world is not.  |");
+            LOGGER.warn("+----------------------------------------------------------------+");
+            LOGGER.warn("  Hardcore is written into level.dat when a world is CREATED. Setting");
+            LOGGER.warn("  it afterwards does nothing -- vanilla ignores the property for a world");
+            LOGGER.warn("  that already exists, and says nothing about it. Your world is still");
+            LOGGER.warn("  in survival: no hardened hearts, and difficulty is not locked to Hard.");
+            LOGGER.warn("");
+            LOGGER.warn("  To convert it: /lethemc admin hardcore on   (then restart)");
+        } else {
+            LOGGER.warn("|  This world IS hardcore, but server.properties says it is not.  |");
+            LOGGER.warn("+----------------------------------------------------------------+");
+            LOGGER.warn("  Nothing is broken -- the world is what counts, and it is hardcore.");
+            LOGGER.warn("");
+            LOGGER.warn("  But server.properties is what a NEW world is created from. If this");
+            LOGGER.warn("  world is ever deleted and regenerated -- a reset, a new season, a");
+            LOGGER.warn("  migration -- the replacement would come back NOT hardcore, quietly.");
+            LOGGER.warn("");
+            LOGGER.warn("  To keep them in step: set hardcore=true in server.properties.");
+        }
         LOGGER.warn("");
-        LOGGER.warn("  To actually get hardcore, create a NEW world with hardcore=true set,");
-        LOGGER.warn("  or edit hardcore in level.dat with an NBT editor.");
-        LOGGER.warn("");
-        LOGGER.warn("  LetheMC does not need hardcore and is running normally. Deaths still");
-        LOGGER.warn("  cost everything and still send players to Purgatory.");
+        LOGGER.warn("  LetheMC does not need hardcore and is running normally either way.");
         LOGGER.warn("+----------------------------------------------------------------+");
+    }
+
+    /**
+     * Whether {@code server.properties} and {@code level.dat} disagree about hardcore.
+     *
+     * @return {@code +1} when the file asks for hardcore the world does not have, {@code -1} when
+     *         the world is hardcore and the file is not, {@code 0} when they agree.
+     */
+    public static int hardcoreMismatch(MinecraftServer s) {
+        if (!(s instanceof DedicatedServer ds)) return 0;
+        boolean file = ds.getProperties().hardcore;
+        boolean world = s.isHardcore();
+        if (file == world) return 0;
+        return file ? 1 : -1;
+    }
+
+    /**
+     * Tells an arriving admin, once, that the two disagree.
+     *
+     * <p>The startup banner is the right place for this, and also the place nobody looks: on a
+     * server that has been up for a week it scrolled past six restarts ago. Admins are the only
+     * people who can act on it and the only people it is shown to.
+     */
+    private static void warnAdminOfHardcoreMismatch(ServerPlayer player) {
+        if (player == null || server == null) return;
+        if (!canAdmin(player.permissions())) return;
+
+        int m = hardcoreMismatch(server);
+        if (m == 0) return;
+
+        String text = m > 0
+                ? "\u00a76[LetheMC] \u00a7fserver.properties asks for \u00a7ehardcore\u00a7f, but this world is not.\n"
+                  + "\u00a77Setting it there cannot convert a world that already exists.\n"
+                  + "\u00a77Run \u00a7f/lethemc admin hardcore on\u00a77, then restart."
+                : "\u00a76[LetheMC] \u00a7fThis world is \u00a7ehardcore\u00a7f, but server.properties says it is not.\n"
+                  + "\u00a77Nothing is broken. But a world regenerated from that file would\n"
+                  + "\u00a77come back without hardcore -- set \u00a7fhardcore=true\u00a77 there to match.";
+        player.sendSystemMessage(Component.literal(text));
     }
 
     /**

@@ -498,12 +498,20 @@ public final class LetheCommand {
         LetheMC.LOGGER.warn("{} switched this world to hardcore={} via /lethemc admin hardcore. "
                 + "level.dat has been written; a restart is required for clients to see it.", who, on);
 
+        // The conversion has very likely just put level.dat out of step with
+        // server.properties, and this is the one moment the admin is thinking about it.
+        final String drift = LetheMC.hardcoreMismatch(LetheMC.server()) != 0
+                ? "\n\u00a77server.properties still says \u00a7fhardcore=" + (!on) + "\u00a77. Update it, or a world\n"
+                  + "\u00a77regenerated from that file later would come back the other way."
+                : "";
+
         src.sendSuccess(() -> Component.literal(
                 "§6level.dat updated: §fhardcore = " + on + "\n"
                 + (on ? "§7Difficulty is now locked to Hard.\n" : "§7Difficulty is unlocked.\n")
                 + "§e⚠ Restart the server for this to take effect.§7 Clients read hardcore from the\n"
                 + "§7login packet, so hearts and the death screen will not change until players\n"
-                + "§7reconnect to a restarted server."), true);
+                + "§7reconnect to a restarted server."
+                + drift), true);
         return 1;
     }
 }
