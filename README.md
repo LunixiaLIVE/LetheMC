@@ -10,28 +10,42 @@ Server-side only. Players connect with a vanilla client; nothing to install on t
 
 ---
 
-## ⚠️ Required server setting
+## ⚠️ Required server settings
 
 ```properties
+hardcore=true
 pause-when-empty-seconds=0
 ```
 
-**LetheMC will refuse to run if this is anything else.** You will see a large `ERROR` block
-in the console at startup, and `/lethemc info` will report the mod as disabled.
+**LetheMC refuses to run unless both are satisfied.** It logs a block naming every requirement
+that is not met and what to do about it, and `/lethemc info` reports the mod as disabled. Deaths
+stay vanilla until you fix them — the mod would rather do nothing than half-work.
 
-Why: a server with this setting stops ticking once the last player leaves — which is exactly
-when a player who just died has left. The wipe would silently never happen, players would
-keep everything, and nothing would tell you. Rather than half-work, LetheMC stands down
-completely and leaves deaths as vanilla until you fix it.
+### `hardcore=true`
 
-If you enable the pause while players are already locked out, LetheMC hands their items
+LetheMC is built for hardcore: one life, and losing it costs everything. Hardcore also locks
+difficulty to **Hard**, which the penalty assumes.
+
+> [!IMPORTANT]
+> **Hardcore is written into `level.dat` when a world is created.** Setting `hardcore=true` in
+> `server.properties` does **not** convert a world that already exists — you need a new world, or
+> to edit `level.dat` directly. The check reads the world, not the properties file, so an
+> existing world will keep failing no matter what the file says.
+
+### `pause-when-empty-seconds=0`
+
+A server with this set stops ticking once the last player leaves — which is exactly when a player
+who just died has left. The purge runs on the tick loop, so the wipe would silently never happen,
+players would keep everything, and nothing would tell you.
+
+If you enable the pause while players are already in Purgatory, LetheMC hands their belongings
 back and clears its records on the next start, so nobody is left in limbo.
 
 ---
 
 ## Settings you do *not* need to change
 
-Two that admins reasonably expect to matter, and neither does.
+Settings admins reasonably expect to matter, which do not.
 
 ### `keepInventory` — leave it alone
 
@@ -45,19 +59,10 @@ That is deliberate. Turning the real gamerule on would change the game for every
 other death on the server — including players LetheMC is configured to exempt — and an admin who
 later turned it off would silently break the "nothing drops" promise.
 
-### `hardcore` — optional, and safe either way
+### `difficulty` — set for you
 
-LetheMC works on a normal server and on a hardcore one. It neither requires hardcore nor disables
-it.
-
-If your world **is** hardcore, the one thing worth knowing is that vanilla turns a dead player
-into a spectator on respawn. A normal LetheMC death never reaches that code — the respawn is held
-for the whole death screen and the player is disconnected instead. A **resurrection** does reach
-it, so that conversion is suppressed for exactly that case; a resurrected player comes back in
-survival, not stuck spectating with all their gear.
-
-> `hardcore` is baked into `level.dat` when the world is **created**. Changing it in
-> `server.properties` afterwards does nothing to an existing world.
+Hardcore locks difficulty to **Hard** on its own. Whatever `difficulty` says in
+`server.properties` is irrelevant on a hardcore world.
 
 ---
 
@@ -70,12 +75,16 @@ survival, not stuck spectating with all their gear.
 | Fabric API | 0.153.0+26.2 |
 | Java | 21+ |
 | Side | Server only |
+| World | **Hardcore** |
 
 ## Install
 
 1. Drop the jar in your server's `mods/` folder alongside Fabric API.
 2. Set `pause-when-empty-seconds=0` in `server.properties`.
-3. Start the server. You should see `LetheMC ready` in the log.
+3. Use a **hardcore** world. Create one with `hardcore=true` set — an existing world cannot be
+   converted from `server.properties`.
+4. Start the server. You should see `LetheMC ready` in the log. If you see a `DISABLED` block
+   instead, it names exactly what is missing.
 
 ---
 

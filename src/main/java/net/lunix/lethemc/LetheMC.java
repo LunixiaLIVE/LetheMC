@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -110,9 +111,9 @@ public class LetheMC implements ModInitializer {
             server = s;
             Ledger.load();
 
-            String problem = checkPreconditions(s);
-            if (problem != null) {
-                standDown(s, problem);
+            List<String> problems = checkPreconditions(s);
+            if (!problems.isEmpty()) {
+                standDown(s, problems);
                 return;
             }
 
@@ -197,13 +198,26 @@ public class LetheMC implements ModInitializer {
      *
      * @return null if everything is in order, else a human-readable reason to stand down.
      */
-    private static String checkPreconditions(MinecraftServer s) {
+    /**
+     * Every requirement that is not met, rather than the first.
+     *
+     * <p>Returning one at a time would make an admin fix, restart, discover a second problem,
+     * fix, and restart again. Both are startup-only settings, so there is no reason to make
+     * them take two restarts.
+     */
+    private static List<String> checkPreconditions(MinecraftServer s) {
+        List<String> problems = new ArrayList<>();
+
         int pause = emptyPauseSeconds(s);
         if (pause > 0) {
-            return "server.properties has pause-when-empty-seconds=" + pause
-                    + " (must be 0)";
+            problems.add("server.properties has pause-when-empty-seconds=" + pause + " (must be 0)");
         }
-        return null;
+        // Read from the server, which reflects level.dat -- not server.properties, which is
+        // only consulted when a world is first created and lies about existing ones.
+        if (!s.isHardcore()) {
+            problems.add("this world is not hardcore");
+        }
+        return problems;
     }
 
     /** The configured empty-pause, or 0 when it cannot apply (integrated server). */
@@ -221,22 +235,48 @@ public class LetheMC implements ModInitializer {
      * with nothing left to ever purge or return them. Backing out leaves the world in a
      * consistent vanilla state.
      */
-    private static void standDown(MinecraftServer s, String reason) {
+    /**
+     * Why a requirement exists and how to satisfy it.
+     *
+     * <p>Kept beside the check rather than in the README, because the console is where an
+     * admin is standing when they find out.
+     */
+    private static List<String> explain(String problem) {
+        if (problem.startsWith("server.properties has pause-when-empty")) {
+            return List.of(
+                    "The purge runs on the server tick loop, and a server that pauses when",
+                    "empty stops ticking exactly when a dying player has just left -- so the",
+                    "wipe would silently never happen.",
+                    "Fix: set pause-when-empty-seconds=0 in server.properties, then restart.");
+        }
+        if (problem.startsWith("this world is not hardcore")) {
+            return List.of(
+                    "LetheMC is built for hardcore: one life, and losing it costs everything.",
+                    "Hardcore also locks difficulty to Hard, which the penalty assumes.",
+                    "Fix: hardcore is written into level.dat when a world is CREATED.",
+                    "Setting hardcore=true in server.properties does NOT convert an existing",
+                    "world -- create a new one with hardcore enabled, or edit level.dat.");
+        }
+        return List.of();
+    }
+
+    private static void standDown(MinecraftServer s, List<String> problems) {
         standingDown = true;
-        standDownReason = reason;
+        standDownReason = String.join("; ", problems);
 
         LOGGER.error("+----------------------------------------------------------------+");
-        LOGGER.error("|  LetheMC is DISABLED and will not take anyone's items.       |");
+        LOGGER.error("|  LetheMC is DISABLED and will not take anyone's items.         |");
         LOGGER.error("+----------------------------------------------------------------+");
-        LOGGER.error("  Reason: {}", reason);
+        LOGGER.error("  {} requirement(s) not met:", problems.size());
+        for (String problem : problems) {
+            LOGGER.error("");
+            LOGGER.error("  * {}", problem);
+            for (String line : explain(problem)) {
+                LOGGER.error("      {}", line);
+            }
+        }
         LOGGER.error("");
-        LOGGER.error("  The purge runs on the server tick loop. A server that pauses when");
-        LOGGER.error("  empty stops ticking exactly when a dying player has just left, so");
-        LOGGER.error("  the wipe would silently never happen and the penalty would not");
-        LOGGER.error("  apply. Rather than half-work, LetheMC stands down entirely.");
-        LOGGER.error("");
-        LOGGER.error("  To fix: set pause-when-empty-seconds=0 in server.properties and");
-        LOGGER.error("  restart. Deaths are vanilla until then.");
+        LOGGER.error("  Deaths are vanilla until every requirement is met.");
         LOGGER.error("+----------------------------------------------------------------+");
 
         int undone = 0;
@@ -264,13 +304,13 @@ public class LetheMC implements ModInitializer {
 
     /** Re-run the precondition check, so /lethemc admin reload can pick up a fix. */
     public static void recheckPreconditions(MinecraftServer s) {
-        String problem = checkPreconditions(s);
-        if (problem == null && standingDown) {
+        List<String> problems = checkPreconditions(s);
+        if (problems.isEmpty() && standingDown) {
             standingDown = false;
             standDownReason = "";
             LOGGER.info("LetheMC re-enabled -- preconditions now satisfied");
-        } else if (problem != null && !standingDown) {
-            standDown(s, problem);
+        } else if (!problems.isEmpty() && !standingDown) {
+            standDown(s, problems);
         }
     }
 
