@@ -3,7 +3,7 @@
 # process while the server still holds its locks on them.
 #
 # The point of the probe: FileChannel.tryLock() is kernel-enforced on Windows and
-# only advisory on POSIX. nixReaper's design claims the graveyard *move* is the
+# only advisory on POSIX. LetheMC's design claims the graveyard *move* is the
 # real protection on Linux and the lock is only defence in depth -- this is what
 # actually checks that, rather than assuming it.
 #
@@ -43,13 +43,13 @@ for d in world/players/data world/players/advancements world/players/stats; do
 done
 
 echo "--- graveyard ---"
-find world/nixreaper -type f -printf '    %f  %s bytes\n' 2>/dev/null
+find world/lethemc -type f -printf '    %f  %s bytes\n' 2>/dev/null
 
 echo
 echo "=== LOCK PROBE from a second process ==="
 python3 - <<'PY'
 import glob, os
-files = sorted(glob.glob('world/nixreaper/graveyard/*/*'))
+files = sorted(glob.glob('world/lethemc/graveyard/*/*'))
 if not files:
     print("    no graveyard files to probe")
 for f in files:

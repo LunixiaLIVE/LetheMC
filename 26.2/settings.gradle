@@ -7,4 +7,4 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-rootProject.name = "nixReaper"
+rootProject.name = "LetheMC"

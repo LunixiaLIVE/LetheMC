@@ -1,6 +1,6 @@
-# nixReaper test server -- known-good settings.
+# LetheMC test server -- known-good settings.
 #
-# pause-when-empty-seconds MUST be 0. nixReaper refuses to run otherwise: the hard
+# pause-when-empty-seconds MUST be 0. LetheMC refuses to run otherwise: the hard
 # delete lives on the tick loop, and a paused server stops ticking exactly when a
 # dying player has just left, so the wipe would silently never happen.
 #
@@ -8,7 +8,7 @@
 # to an existing world -- you must generate a new one.
 
 server-port=25565
-motd=nixReaper 0.1.0.2 test server
+motd=LetheMC 0.1.0.2 test server
 online-mode=false
 enforce-secure-profile=false
 gamemode=survival
@@ -27,6 +27,6 @@ enable-command-block=false
 sync-chunk-writes=true
 enable-rcon=true
 rcon.port=25575
-rcon.password=nixreapertest
+rcon.password=lethemctest
 broadcast-rcon-to-ops=true
 pause-when-empty-seconds=0
