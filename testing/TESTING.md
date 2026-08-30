@@ -1,4 +1,4 @@
-# Testing nixReaper
+# Testing LetheMC
 
 Notes from the 2026-08-28 session, kept so the next test server does not have to
 rediscover any of it.
@@ -8,7 +8,7 @@ rediscover any of it.
 1. Fabric server launcher:
    `https://meta.fabricmc.net/v2/versions/loader/<mc>/<loader>/<installer>/server/jar`
    (26.2 / 0.19.3 / 1.1.2 worked).
-2. `mods/` gets the nixReaper jar plus a matching Fabric API.
+2. `mods/` gets the LetheMC jar plus a matching Fabric API.
 3. `eula.txt` → `eula=true`.
 4. Copy `server.properties.example`, **set your own `rcon.password`**.
 5. `java -jar fabric-server-launch.jar nogui`.
@@ -21,7 +21,7 @@ Drive admin commands with `rcon.py` (set `RCON_PASSWORD` in the environment).
 nothing happens. The tester must stay non-op — which is also why admin commands
 have to come over RCON rather than in-game.
 
-**`pause-when-empty-seconds` must be 0.** Otherwise nixReaper stands down and
+**`pause-when-empty-seconds` must be 0.** Otherwise LetheMC stands down and
 refuses to run at all. This is deliberate; see the startup banner.
 
 **`hardcore` is baked into `level.dat` at world creation.** Setting it in
