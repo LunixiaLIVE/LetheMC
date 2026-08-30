@@ -29,6 +29,38 @@ back and clears its records on the next start, so nobody is left in limbo.
 
 ---
 
+## Settings you do *not* need to change
+
+Two that admins reasonably expect to matter, and neither does.
+
+### `keepInventory` — leave it alone
+
+LetheMC does **not** require it, and setting it either way changes nothing about how a death is
+handled. Nothing dropping on death is not the gamerule; the mod intercepts the *read* of
+`keepInventory` for the single tick a player is dying and answers `true`, so vanilla spawns no
+items. The stored gamerule is never written, and the override does not apply to anyone else, at
+any other moment.
+
+That is deliberate. Turning the real gamerule on would change the game for every player and every
+other death on the server — including players LetheMC is configured to exempt — and an admin who
+later turned it off would silently break the "nothing drops" promise.
+
+### `hardcore` — optional, and safe either way
+
+LetheMC works on a normal server and on a hardcore one. It neither requires hardcore nor disables
+it.
+
+If your world **is** hardcore, the one thing worth knowing is that vanilla turns a dead player
+into a spectator on respawn. A normal LetheMC death never reaches that code — the respawn is held
+for the whole death screen and the player is disconnected instead. A **resurrection** does reach
+it, so that conversion is suppressed for exactly that case; a resurrected player comes back in
+survival, not stuck spectating with all their gear.
+
+> `hardcore` is baked into `level.dat` when the world is **created**. Changing it in
+> `server.properties` afterwards does nothing to an existing world.
+
+---
+
 ## Requirements
 
 | | |
