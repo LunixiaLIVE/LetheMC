@@ -1,6 +1,6 @@
-# nixReaper — Design Doc
+# LetheMC — Design Doc
 
-**Name:** `nixReaper` — Modrinth slug `nixreaper` **verified free** 2026-08-20. CurseForge unverified (Cloudflare 403) — check manually before registering.
+**Name:** `LetheMC` — Modrinth slug `lethemc` **verified free** 2026-08-20. CurseForge unverified (Cloudflare 403) — check manually before registering.
 **Status:** implemented and **in-game tested end to end on 2026-08-28** against a real client (v0.1.0.4). Four bugs found and fixed during that session — see §10.
 **Target:** Fabric, MC 26.x, **server-side only** (vanilla clients connect unmodified)
 
@@ -19,7 +19,7 @@
 | **G** | **Total UUID purge** — everything associated with the player is erased except their ban-list entry, whitelist entry, and op status. Includes stats and advancements. |
 | **H** | Files leave the live world **immediately** on removal (entombed in a graveyard), and are hard-deleted after a **grace period (default 5 min)**. |
 | **I** | **Lockout duration must always exceed the grace period.** Enforced by config validation — the hard delete can never outlive the ban. |
-| **J** | `/nr admin pardon` **cancels both the lockout and any pending purge** — pardoning inside the grace period restores the player's files out of the graveyard **and carries their inventory + XP through the respawn that follows** (§4.10). |
+| **J** | `/lethe admin pardon` **cancels both the lockout and any pending purge** — pardoning inside the grace period restores the player's files out of the graveyard **and carries their inventory + XP through the respawn that follows** (§4.10). |
 | **K** | The mod **refuses to run** if `pause-when-empty-seconds > 0`, because the purge would silently never fire (§4.11). |
 | **L** | Composes with vanilla **hardcore**: the spectator lock is bypassed, not disabled, and a resurrected player never becomes a spectator (§4.12). |
 | **M** | The lockout is called **Purgatory**; leaving it is **Resurrection** (intact) or **Reincarnation** (empty). Stakes are always named plainly as *Inventory, Ender Chest & XP* (§4.14). |
@@ -44,7 +44,7 @@ t=T        T = min(deathScreenSeconds elapsed, manual disconnect)
 
 t=T        ENTOMB  (tail of PlayerList.remove — same tick, not a timer)
            ├─ vanilla has just flushed playerdata + stats + advancements
-           ├─ MOVE all four files → <world>/nixreaper/graveyard/<uuid>/
+           ├─ MOVE all four files → <world>/lethemc/graveyard/<uuid>/
            ├─ take an exclusive FileLock on each
            └─ graveyardAt = T, purgeAt = T + wipe.graceMinutes
            ── live world dirs are clean from this instant ──
@@ -152,7 +152,7 @@ Per-UUID files in the world folder:
 | `ops.json` | Silently deops staff who die. Hard exclusion. |
 | `banned-players.json` | Vanilla bans are unrelated to this mod. |
 | `usercache.json` | Name↔UUID cache; removing it breaks name resolution in commands for no benefit. |
-| nixReaper ledger | The ban entry itself — explicitly excluded per spec. |
+| LetheMC ledger | The ban entry itself — explicitly excluded per spec. |
 
 ### 4.3 Side effects of wiping advancements + stats — intended, but worth knowing
 - **Recipe book resets completely.** Recipe unlocks live in the advancement file, so the player returns unable to craft anything they hadn't rediscovered. Bigger in practice than losing advancement toasts.
@@ -184,7 +184,7 @@ t=T+5min   hard delete fires on a LIVE player
 **Where it must be enforced** — all three, since every one of them is reachable at runtime:
 1. **Config load** — reject or clamp an invalid file, log loudly.
 2. **`config set`** — in *both* directions. Lowering `lockout.minutes` and raising `wipe.graceMinutes` can each break the invariant, so both setters validate against the other's current value.
-3. **`/nr admin lock <player> [dur]`** — a manual lock with a custom duration is subject to the same floor.
+3. **`/lethe admin lock <player> [dur]`** — a manual lock with a custom duration is subject to the same floor.
 
 Error text should name both values and the resulting minimum, e.g.
 `lockout.minutes must be greater than wipe.graceMinutes (5). Try 6 or higher.`
@@ -217,7 +217,7 @@ Startup recovery has three jobs, in this order:
 
 ### 4.6 ✅ LOCKED: pardon cancels the lockout *and* the pending purge (**J**)
 
-`/nr admin pardon <player>` clears the ledger entry **and** cancels any scheduled purge. Consequence, by design:
+`/lethe admin pardon <player>` clears the ledger entry **and** cancels any scheduled purge. Consequence, by design:
 
 | When the pardon lands | Result |
 |---|---|
@@ -233,7 +233,7 @@ Restoring is safe without any online-player check: a pardonable player is necess
 permission — die, pardon, keep everything, repeat. Another admin or the server console can still
 pardon them, so a genuinely bogus death stays recoverable; it just stops being a decision someone
 makes alone about themselves. Note this guard is *mostly dormant today*: `bypass.permissionLevel`
-gates `/nr admin` and the death exemption with the same value, so anyone who can pardon never
+gates `/lethe admin` and the death exemption with the same value, so anyone who can pardon never
 gets a ledger entry in the first place. It is reachable when a locked-out player is opped
 afterwards, and becomes load-bearing the moment those two permissions are split (§10).
 
@@ -243,7 +243,7 @@ A **failed** restore does not clear the ledger entry. The plot stays intact, the
 - `Pardoned <player> — purge cancelled, data restored.`
 - `Pardoned <player> — lockout lifted, but data was already purged.`
 
-`/nr admin status <player>` should surface time-remaining-in-window so an admin can see whether restoration is still possible before deciding.
+`/lethe admin status <player>` should surface time-remaining-in-window so an admin can see whether restoration is still possible before deciding.
 
 ### 4.7 `wipePending` is load-bearing
 It was a safety net when the purge fired immediately. It is now a core mechanism, enforcing four things:
@@ -261,7 +261,7 @@ Note it means "the obligation is not discharged", not "a timer is running". `gra
 
 ### 4.9 The graveyard
 
-`<world>/nixreaper/graveyard/<uuid>/` holding `playerdata.dat`, `playerdata.dat_old`, `advancements.json`, `stats.json` — fixed names, so restore is a deterministic mapping back to the live paths.
+`<world>/lethemc/graveyard/<uuid>/` holding `playerdata.dat`, `playerdata.dat_old`, `advancements.json`, `stats.json` — fixed names, so restore is a deterministic mapping back to the live paths.
 
 **Why inside the world folder, not `config/`.** A move within one filesystem is a rename: atomic, instant, and incapable of leaving a second copy behind if the server dies halfway. Putting the graveyard under the world guarantees it shares a filesystem with `playerdata/` no matter how the host has mounted things. Bonus: a world backup captures the graveyard consistently with the world it belongs to.
 
@@ -329,7 +329,7 @@ Redirecting the *call* rather than injecting at the method head is deliberate:
 aborted pass would never be cleared. The flag is global — `GameRules#get` has no player
 context — so it must not outlive the single call it wraps, or an unrelated player dying in the
 same window would wrongly keep their items. A `PARDONED` player who rejoins *alive* (pardoned
-after `/nr admin lock`, never dead) has no respawn coming, so the entry is retired on join.
+after `/lethe admin lock`, never dead) has no respawn coming, so the entry is retired on join.
 
 Verified: `XpLevel: 35`, full inventory, all four armour pieces (26.x keeps worn gear in an
 `equipment` compound, not `ArmorItems`), ender chest intact, ledger emptied.
@@ -351,7 +351,7 @@ whole pause block when ≤ 0, and `DedicatedServer` overrides the method so the 
 usually to save CPU on a host running several servers.
 
 **Chosen fix:** read the setting at startup and, if it is non-zero, **stand down entirely** —
-a loud multi-line `ERROR` banner, `/nr info` and `/nr admin list` reporting DISABLED, and no
+a loud multi-line `ERROR` banner, `/lethe info` and `/lethe admin list` reporting DISABLED, and no
 death interception, no lockout enforcement, no file movement at all. Half-working is the one
 outcome worse than off: taking a player's inventory and then failing to run the lockout is
 strictly worse than never having touched them. Standing down also *undoes* pending state —
@@ -367,7 +367,7 @@ runs an unconditional `setGameMode(SPECTATOR)`. That branch tests `isHardcore()`
 else — there is no "has died" flag anywhere. The spectator state persists only because it is
 written to `playerGameType` in playerdata afterwards.
 
-**A normal nixReaper death never reaches it.** `shouldBlockRespawn` cancels the respawn packet
+**A normal LetheMC death never reaches it.** `shouldBlockRespawn` cancels the respawn packet
 at HEAD for the whole death screen, so `PlayerList.respawn` and the spectator conversion are
 both unreachable while a player is `DYING`. They are held, kicked, wiped, and return in
 survival. Vanilla's penalty is *bypassed*, not disabled — hardcore hearts and the difficulty
@@ -430,13 +430,13 @@ have to decode a metaphor to find out what they are losing.
 and it connotes restoration, which is what Resurrection does. Reincarnation is the exact
 opposite and the correct word: new life, nothing carried over.
 
-`/nr admin resurrect` is an **alias** for `pardon`, not a replacement. One behaviour, quietly
+`/lethe admin resurrect` is an **alias** for `pardon`, not a replacement. One behaviour, quietly
 downgrading when the remains are gone, reachable by whichever word the admin thinks in.
 
 #### Reincarnation greeting
 Purgatory ending used to be silent — the player simply appeared holding nothing, which reads as
 a bug rather than the mechanic. They now get a greeting plus a random line from
-`config/nixreaper/reincarnation.txt` (plain text, one phrase per line, reloadable, ships with
+`config/lethemc/reincarnation.txt` (plain text, one phrase per line, reloadable, ships with
 ten). **The file is the only switch**: empty it and the greeting appears alone. A separate
 enable flag would be one more thing to explain and to desynchronise.
 
@@ -460,28 +460,28 @@ renders that Component verbatim. `ServerPlayerMixin` modifies that argument, giv
 
 ## 5. Commands (**E**)
 
-Root `/nixreaper`, alias `/nr`.
+Root `/lethemc`, alias `/lethe`.
 
 ### Player (open to everyone)
 ```
-/nr                         # alias for info
-/nr info                    # what happens when you die: clock, duration,
+/lethe                      # alias for info
+/lethe info                    # what happens when you die: clock, duration,
                             #   what gets wiped — human-readable
-/nr status                  # your own lockout state
+/lethe status                  # your own lockout state
 ```
 
 ### Admin (`bypass.permissionLevel`, default op 4)
 ```
-/nr admin config list             # all keys + current values
-/nr admin config get <key>
-/nr admin config set <key> <val>  # writes through immediately, no restart
-/nr admin reload                  # hot-reload config from disk
-/nr admin status <player>         # includes whether a purge is still pending
-/nr admin list                    # everyone currently locked out
-/nr admin pardon <player>         # lifts lockout AND cancels pending purge;
+/lethe admin config list             # all keys + current values
+/lethe admin config get <key>
+/lethe admin config set <key> <val>  # writes through immediately, no restart
+/lethe admin reload                  # hot-reload config from disk
+/lethe admin status <player>         # includes whether a purge is still pending
+/lethe admin list                    # everyone currently locked out
+/lethe admin pardon <player>         # lifts lockout AND cancels pending purge;
                                   #   inside the window = full restore (§4.6)
-/nr admin lock <player> [dur]     # apply the penalty manually
-/nr admin purge <player>          # force the pending purge immediately
+/lethe admin lock <player> [dur]     # apply the penalty manually
+/lethe admin purge <player>          # force the pending purge immediately
 ```
 
 `config set` and `reload` are both needed: `set` for live tweaks, `reload` for admins who hand-edited the JSON.
@@ -580,11 +580,11 @@ Surveyed Modrinth + CurseForge 2026-08-20. This combination does not exist.
 
 ## 8. Build Status (2026-08-29)
 
-Project: `IdeaProjects/MC_Code/nixReaper/26.2` — single-loader Fabric, `environment: "server"`, Java 21, loom 1.16.0-alpha.13, MC 26.2 / loader 0.19.3 / fabric-api 0.153.0+26.2. Jar: `build/libs/nixreaper-0.1.1.1_MC-26.2.jar`.
+Project: `IdeaProjects/MC_Code/LetheMC/26.2` — single-loader Fabric, `environment: "server"`, Java 21, loom 1.16.0-alpha.13, MC 26.2 / loader 0.19.3 / fabric-api 0.153.0+26.2. Jar: `build/libs/lethemc-0.1.1.1_MC-26.2.jar`.
 
 ### Verified
 - Compiles clean; jar builds.
-- Dev server boots, mod initialises (`nixReaper ready -- lockout 360 min, grace 5 min`).
+- Dev server boots, mod initialises (`LetheMC ready -- lockout 360 min, grace 5 min`).
 - **All four mixins confirmed applied** with correct descriptors:
   `GameRulesMixin` → `world.level.gamerules.GameRules`, `PlayerListMixin` → `server.players.PlayerList`,
   `ServerGamePacketListenerMixin` → `server.network.ServerGamePacketListenerImpl`,
@@ -625,7 +625,7 @@ later deleted) and **Linux/Fedora 43 2026-08-29** (`minecraft@10.10.40.11`, hard
   mid-flight.
 - Entombment retry after a genuinely blocked move, and a failing restore.
 - Stand-down **with pending entries** (restoring people out of the graveyard on boot).
-- `/nr admin purge`, `/nr admin lock`, `/nr status`, and bad-config clamping.
+- `/lethe admin purge`, `/lethe admin lock`, `/lethe status`, and bad-config clamping.
 - The self-pardon guard has never fired — it is unreachable until `bypass.permissionLevel` is
   split, since anyone who can pardon is currently also exempt from dying.
 
@@ -639,7 +639,7 @@ Worth recording — several of these are new since the 26.1 single-loader mods:
   `NameAndId` is a record with `id()` / `name()`.
 - **Integer permission levels are gone.** `CommandSourceStack.permissions()` and `ServerPlayer.permissions()` return a
   `PermissionSet`; check with `hasPermission(Permission)` against `Permissions.COMMANDS_MODERATOR/GAMEMASTER/ADMIN/OWNER`.
-  nixReaper keeps `bypass.permissionLevel` as 0-4 in config and maps it internally, so admins keep the vocabulary they know.
+  LetheMC keeps `bypass.permissionLevel` as 0-4 in config and maps it internally, so admins keep the vocabulary they know.
 - `authlib` `GameProfile` no longer exposes `getName()` / `getId()`. Use `player.getName().getString()`.
 - `disconnect(Component)` lives on `ServerCommonPacketListenerImpl`.
 - Mixin `compatibilityLevel: JAVA_21` works when compiling at release 21 (the suite's JAVA_25 note applies to
@@ -649,7 +649,7 @@ Worth recording — several of these are new since the 26.1 single-loader mods:
 
 ## 9. Next Steps
 
-1. Verify CurseForge slug `nixreaper` manually.
+1. Verify CurseForge slug `lethemc` manually.
 2. Scaffold Fabric 26.x server-side project.
 3. Implement keep-inventory override + ledger + death-screen hold + timer-start rule (§3.1).
 4. Implement the delayed purge + the §4.4 constraint validators + `wipePending` enforcement — **verify §6.3 `.dat_old` first.**
@@ -675,7 +675,7 @@ All four found by driving a real client against a throwaway server; none were re
 | 1 | **High** | Pardon restored the files, then the respawn destroyed inventory + XP. Ender chest survived only by vanilla accident. | keep-inventory override keyed on `DYING_NOW`, empty by respawn time | `PARDONED` state + `@Redirect` around `PlayerList.respawn` (§4.10) |
 | 2 | **High** | Hard delete never ran on a paused (empty) server | sweep lives on the tick loop; `pause-when-empty-seconds` stops ticking exactly when the purge falls due | stand down and refuse to run (§4.11) |
 | 3 | Medium | Player told "permanently erased" while the files were still on disk | message flipped when `purgeAt` *passed*, not when the delete *succeeded* | `DataState` enum |
-| 4 | Low | `/nr admin status` reported "in graveyard" after the purge | `entombed()` is `graveyardAt > 0`, never cleared, and was tested before `wipePending` | `DataState` enum |
+| 4 | Low | `/lethe admin status` reported "in graveyard" after the purge | `entombed()` is `graveyardAt > 0`, never cleared, and was tested before `wipePending` | `DataState` enum |
 | 5 | Low | The respawn redirect hooked **both** `PlayerList.respawn` call sites, so a `PARDONED` player returning from the End consumed their pardon | no `ordinal` on the `@Redirect` | `ordinal = 1` (the death respawn) |
 | 6 | **High** | Auto-respawn saved a **stale entity over live playerdata**, destroying inventory, armour and XP. Introduced in `0.1.0.7`, fixed in `0.1.0.8`. | called `PlayerList.respawn` directly and skipped the three things vanilla does after it, leaving `connection.player` on the removed entity | replay a `PERFORM_RESPAWN` packet instead (§4.13) |
 | 7 | Medium | The kick screen said "Everything you owned has been erased" **before the player was even entombed**, and stayed wrong for the whole grace period | hardcoded assertion in the default `message.death` | `%grace_line%`, which reads `dataState()` |
@@ -700,7 +700,7 @@ feature not work, and **neither is detectable without a client**. Mixin verifica
 code is reachable, not that it is right.
 
 ### Not a bug, but worth fixing
-`bypass.permissionLevel` gates the death exemption **and** `/nr admin` with the same value, so
+`bypass.permissionLevel` gates the death exemption **and** `/lethe admin` with the same value, so
 anyone who can pardon is also immune to dying. This makes the mod awkward to test (the tester
 must stay non-op and drive admin commands over RCON) and forces server owners to choose between
 having moderators and having moderators who can die. There is also no value meaning "nobody is

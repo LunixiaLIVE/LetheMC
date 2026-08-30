@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "id": "nixreaper",
+  "id": "lethemc",
   "version": "${version}",
-  "name": "nixReaper",
+  "name": "LetheMC",
   "description": "Death wipes everything you own -- inventory, ender chest, XP, advancements, stats -- and locks you out of the server for a configurable stretch of real time. Server-side only; vanilla clients need nothing installed.",
   "authors": ["LunixiaLIVE"],
   "contact": {
-    "sources": "https://github.com/LunixiaLIVE/nixReaper"
+    "sources": "https://github.com/LunixiaLIVE/LetheMC"
   },
   "license": "MIT",
   "environment": "server",
   "entrypoints": {
     "main": [
-      "net.lunix.nixreaper.NixReaper"
+      "net.lunix.lethemc.LetheMC"
     ]
   },
   "mixins": [
-    "nixreaper.mixins.json"
+    "lethemc.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",

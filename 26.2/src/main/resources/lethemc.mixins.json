@@ -1,0 +1,27 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.lunix.lethemc.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "GameRulesMixin",
+    "PlayerListMixin",
+    "ServerPlayerMixin",
+    "TamableAnimalMixin",
+    "AbstractHorseMixin",
+    "MobInteractWardMixin",
+    "LivingEntityWardMixin",
+    "MountMenuWardMixin",
+    "FoxMixin",
+    "FoxAccessor",
+    "ServerGamePacketListenerMixin",
+    "VaultServerDataMixin",
+    "VaultBlockEntityMixin",
+    "GossipContainerMixin",
+    "VillagerMixin",
+    "BlockEntityAttachMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

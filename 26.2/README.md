@@ -1,4 +1,4 @@
-# nixReaper
+# LetheMC
 
 Death costs you everything — **including your ender chest** — and sends you to **Purgatory**:
 locked out of the server for a set amount of real time.
@@ -16,15 +16,15 @@ Server-side only. Players connect with a vanilla client; nothing to install on t
 pause-when-empty-seconds=0
 ```
 
-**nixReaper will refuse to run if this is anything else.** You will see a large `ERROR` block
-in the console at startup, and `/nr info` will report the mod as disabled.
+**LetheMC will refuse to run if this is anything else.** You will see a large `ERROR` block
+in the console at startup, and `/lethe info` will report the mod as disabled.
 
 Why: a server with this setting stops ticking once the last player leaves — which is exactly
 when a player who just died has left. The wipe would silently never happen, players would
-keep everything, and nothing would tell you. Rather than half-work, nixReaper stands down
+keep everything, and nothing would tell you. Rather than half-work, LetheMC stands down
 completely and leaves deaths as vanilla until you fix it.
 
-If you enable the pause while players are already locked out, nixReaper hands their items
+If you enable the pause while players are already locked out, LetheMC hands their items
 back and clears its records on the next start, so nobody is left in limbo.
 
 ---
@@ -43,7 +43,7 @@ back and clears its records on the next start, so nobody is left in limbo.
 
 1. Drop the jar in your server's `mods/` folder alongside Fabric API.
 2. Set `pause-when-empty-seconds=0` in `server.properties`.
-3. Start the server. You should see `nixReaper ready` in the log.
+3. Start the server. You should see `LetheMC ready` in the log.
 
 ---
 
@@ -65,7 +65,7 @@ lockout started at 22:00 has expired by 04:00 whether or not the server ran over
 ### Resurrection
 
 For `wipe.graceMinutes` after a death (5 by default) the player's belongings still exist, and
-`/nr admin pardon <player>` — or `/nr admin resurrect <player>`, the same command — gives back
+`/lethe admin pardon <player>` — or `/lethe admin resurrect <player>`, the same command — gives back
 **everything**: inventory, worn armour, ender chest, XP, advancements, stats. They rejoin and
 are placed back in the world at their bed or spawn, alive, without even seeing a death screen.
 
@@ -73,7 +73,7 @@ Use it for deaths that were not the player's fault: a lag spike, a bad chunk loa
 mistake.
 
 After that window the belongings are gone for good. The same command still works, but it only
-releases them from Purgatory early — they return with nothing. `/nr admin status <player>`
+releases them from Purgatory early — they return with nothing. `/lethe admin status <player>`
 tells you which outcome you will get **before** you decide.
 
 Admins **cannot resurrect themselves**, only other people. Otherwise the penalty is optional for
@@ -88,8 +88,8 @@ than a bug:
 > **You have been reincarnated.** Nothing of your old life remains.
 > *Maybe this time you won't be so careless.*
 
-That second line is picked at random from `config/nixreaper/reincarnation.txt` — plain text, one
-phrase per line, ten included. Edit it and run `/nr admin reload`; no restart. Remove every
+That second line is picked at random from `config/lethemc/reincarnation.txt` — plain text, one
+phrase per line, ten included. Edit it and run `/lethe admin reload`; no restart. Remove every
 phrase and the greeting appears on its own.
 
 ### Your animals
@@ -121,7 +121,7 @@ existing world does not cull everyone's pets.
 ### The world remembers you too
 
 Your player files are not the only place your name is kept. Three things out in the world record
-it against your UUID, and all three outlive a purge unless nixReaper deals with them.
+it against your UUID, and all three outlive a purge unless LetheMC deals with them.
 
 **Trial vaults forget you.** A vault you emptied in a past life opens again. This is the only one
 that *costs* you something rather than granting it — without it a reincarnated player walks up to
@@ -155,14 +155,14 @@ Three rules keep it from emptying your village:
 
 ## Commands
 
-Root command is `/nixreaper`, aliased to `/nr`.
+Root command is `/lethemc`, aliased to `/lethe`.
 
 ### Everyone
 
 | Command | Does |
 |---|---|
-| `/nr` or `/nr info` | What happens when you die, current durations |
-| `/nr status` | Your own lockout, if any |
+| `/lethe` or `/lethe info` | What happens when you die, current durations |
+| `/lethe status` | Your own lockout, if any |
 
 ### Admin
 
@@ -172,16 +172,16 @@ resurrect themselves.
 
 | Command | Does |
 |---|---|
-| `/nr admin list` | Everyone currently locked out |
-| `/nr admin status <player>` | Their lockout, where their data is, whether a pardon still restores it |
-| `/nr admin pardon <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot pardon yourself** — ask another admin or use the console |
-| `/nr admin resurrect <player>` | Alias for `pardon` — same command, thematic name |
-| `/nr admin purge <player>` | Erase their data now, skipping the grace period |
-| `/nr admin lock <player> [minutes]` | Lock someone out manually |
-| `/nr admin config list` | Show all settings |
-| `/nr admin config get <key>` | Read one setting |
-| `/nr admin config set <key> <value>` | Change one setting, saved immediately |
-| `/nr admin reload` | Re-read the config from disk |
+| `/lethe admin list` | Everyone currently locked out |
+| `/lethe admin status <player>` | Their lockout, where their data is, whether a pardon still restores it |
+| `/lethe admin pardon <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot pardon yourself** — ask another admin or use the console |
+| `/lethe admin resurrect <player>` | Alias for `pardon` — same command, thematic name |
+| `/lethe admin purge <player>` | Erase their data now, skipping the grace period |
+| `/lethe admin lock <player> [minutes]` | Lock someone out manually |
+| `/lethe admin config list` | Show all settings |
+| `/lethe admin config get <key>` | Read one setting |
+| `/lethe admin config set <key> <value>` | Change one setting, saved immediately |
+| `/lethe admin reload` | Re-read the config from disk |
 
 ### Who dies, and who can administer
 
@@ -196,15 +196,15 @@ having stakes.
 | Builders immune, moderators mortal | `2` | `3` |
 
 The default means you can resurrect other people and still face Purgatory yourself, which is
-usually what you want on a server whose whole premise is that death costs something. `/nr info`
+usually what you want on a server whose whole premise is that death costs something. `/lethe info`
 tells players when nobody is exempt, so it is visible rather than assumed.
 
 Both are settable in-game and take effect immediately:
 
 ```
-/nr admin config set bypass.permissionLevel -1
-/nr admin config set admin.permissionLevel 3
-/nr admin reload
+/lethe admin config set bypass.permissionLevel -1
+/lethe admin config set admin.permissionLevel 3
+/lethe admin reload
 ```
 
 > **Upgrading?** An existing `config.json` already has `bypassPermissionLevel` written out and
@@ -215,8 +215,8 @@ Both are settable in-game and take effect immediately:
 
 ## Config
 
-`config/nixreaper/config.json`, created on first start. Every key is also settable in-game
-with `/nr admin config set`.
+`config/lethemc/config.json`, created on first start. Every key is also settable in-game
+with `/lethe admin config set`.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -239,7 +239,7 @@ with `/nr admin config set`.
 | `message.deathScreen` | — | The one line of the in-game death screen a server can control. **Must stay one line** — see below |
 | `message.reincarnation` | — | Greeting when Purgatory ends |
 | `bypass.permissionLevel` | `-1` | Who is exempt from dying. `-1` nobody, `0` everyone, `1`-`4` that op level and above |
-| `admin.permissionLevel` | `4` | Who can run `/nr admin ...`. `0`-`4` |
+| `admin.permissionLevel` | `4` | Who can run `/lethe admin ...`. `0`-`4` |
 
 **`lockout.minutes` must be greater than `wipe.graceMinutes`.** Both are in minutes, so at the
 defaults that means a minimum lockout of 6 minutes. Values that break the rule are rejected with a message
@@ -265,7 +265,7 @@ with no wrapping, so anything longer collides with it.
 
 Everything else on that screen — "Game Over!", "Score:", and the buttons — comes from the
 client's own language file. A server-side mod cannot change those, which is why the death
-message is the only line nixReaper touches.
+message is the only line LetheMC touches.
 
 Times are shown as **durations**, never clock times. An absolute unlock time has to be printed
 in some timezone, and the server's is not necessarily the player's, with nothing on screen
