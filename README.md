@@ -92,10 +92,49 @@ is irrelevant there. On a non-hardcore world it behaves normally and LetheMC doe
 
 ## Install
 
-1. Drop the jar in your server's `mods/` folder alongside Fabric API.
-2. Set `pause-when-empty-seconds=0` in `server.properties`.
-3. Start the server. You should see `LetheMC ready` in the log. If you see a `DISABLED` block
-   instead, it names exactly what is missing.
+The only step whose **order matters** is hardcore. Everything else can be done whenever.
+
+### 🆕 A brand-new server
+
+Hardcore has to be decided **before the world is generated**, so set it first.
+
+1. **Edit `server.properties` before the first launch:**
+   ```properties
+   pause-when-empty-seconds=0
+   hardcore=true            # only if you want hardcore; it is optional
+   ```
+2. Put the LetheMC jar and **Fabric API** in `mods/`.
+3. **Start the server.** The world is created with whatever `hardcore` said, and you should see
+   `LetheMC ready` in the log.
+4. Tune it to taste with `/lethemc admin config set …`, or edit `config/lethemc/config.json`.
+
+That's it — no restart dance, because the world was born the way you wanted it.
+
+### 🔁 An existing server
+
+`hardcore` in `server.properties` **cannot** convert a world that already exists, so it takes a
+restart to switch it on. Do the rest first.
+
+1. **Back up your world.** LetheMC starts taking things the first time somebody dies, and the
+   grace period is the only way back.
+2. **Stop the server.**
+3. Set `pause-when-empty-seconds=0` in `server.properties`.
+4. Put the LetheMC jar and **Fabric API** in `mods/`.
+5. **Start the server.** You should see `LetheMC ready`. Nobody's data is touched until they die.
+6. *Only if you want hardcore:* run **`/lethemc admin hardcore on`**, then **restart** the server.
+   The `level.dat` change is saved immediately, but clients read the hardcore flag when they log
+   in, so hearts do not change until they reconnect to a restarted server.
+7. Tune it with `/lethemc admin config set …`.
+
+> [!TIP]
+> Set `purgatory.minutes` and `wipe.graceMinutes` to something short while you try it out, so you
+> are not locked out for six hours testing your own server. `/lethemc admin config set
+> purgatory.minutes 5` and `/lethemc admin config set wipe.graceMinutes 2` are comfortable.
+
+### Checking it worked
+
+`/lethemc info` reports what a death costs and the current durations. If the mod stood down, it
+says so there and names the reason in the console.
 
 ---
 
