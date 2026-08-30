@@ -85,9 +85,9 @@ is irrelevant there. On a non-hardcore world it behaves normally and LetheMC doe
 | | |
 |---|---|
 | Minecraft | 26.2 |
-| Loader | Fabric 0.19.3+ |
-| Fabric API | 0.153.0+26.2 |
-| Java | 21+ |
+| Loaders | **Fabric** 0.19.3+ · **NeoForge** |
+| Fabric API | *Fabric only; NeoForge needs nothing extra* |
+| Java | **25+** — the jar is compiled to Java 25 and will not load on anything older |
 | Side | Server only |
 
 ## Install
