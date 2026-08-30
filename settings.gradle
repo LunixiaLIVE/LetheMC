@@ -7,5 +7,5 @@ pluginManagement {
     }
 }
 
-rootProject.name = "LetheMC_multi_26.2"
+rootProject.name = "LetheMC_multi_26.1"
 include("common", "fabric", "neoforge")
