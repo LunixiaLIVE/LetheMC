@@ -65,7 +65,7 @@ Purgatory started at 22:00 has expired by 04:00 whether or not the server ran ov
 ### Resurrection
 
 For `wipe.graceMinutes` after a death (5 by default) the player's belongings still exist, and
-`/lethemc admin pardon <player>` — or `/lethemc admin resurrect <player>`, the same command — gives back
+`/lethemc admin resurrect <player>` gives back
 **everything**: inventory, worn armour, ender chest, XP, advancements, stats. They rejoin and
 are placed back in the world at their bed or spawn, alive, without even seeing a death screen.
 
@@ -177,9 +177,8 @@ resurrect themselves.
 | Command | Does |
 |---|---|
 | `/lethemc admin list` | Everyone currently in Purgatory |
-| `/lethemc admin status <player>` | Their Purgatory, where their data is, whether a pardon still restores it |
-| `/lethemc admin pardon <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot pardon yourself** — ask another admin or use the console |
-| `/lethemc admin resurrect <player>` | Alias for `pardon` — same command, thematic name |
+| `/lethemc admin status <player>` | Their Purgatory, where their data is, whether resurrection still restores it |
+| `/lethemc admin resurrect <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot resurrect yourself** — ask another admin or use the console |
 | `/lethemc admin purge <player>` | Erase their data now, skipping the grace period |
 | `/lethemc admin lock <player> [minutes]` | Send someone to Purgatory manually |
 | `/lethemc admin config list` | Show all settings |
@@ -227,7 +226,7 @@ with `/lethemc admin config set`.
 | `wipe.playerData` | `true` | Erase inventory, ender chest, XP, spawn point |
 | `wipe.advancements` | `true` | Erase advancements **and recipe book unlocks** |
 | `wipe.stats` | `true` | Erase statistics |
-| `wipe.graceMinutes` | `5` | How long a pardon still restores everything |
+| `wipe.graceMinutes` | `5` | How long resurrection still restores everything |
 | `wipe.lockFiles` | `true` | Lock held files so nothing else can block the wipe |
 | `wipe.pets` | `true` | Destroy tamed wolves, cats and parrots on reincarnation |
 | `wipe.livestock` | `true` | Destroy tamed horses, donkeys, mules, llamas and camels — **and their cargo** |
@@ -259,7 +258,7 @@ boot.
 | `%time_remaining_short%` | `00:02:14:33` — `DD:HH:MM:SS` |
 | `%unlock_time%` | Wall-clock time the Purgatory ends, in the **server's** timezone |
 | `%death_reason%` | The vanilla death message |
-| `%grace_remaining%` | Time a pardon still restores everything, or `expired` |
+| `%grace_remaining%` | Time resurrection still restores everything, or `expired` |
 | `%grace_remaining_short%` | `00:00:04:12` — `DD:HH:MM:SS` |
 | `%grace_line%` | A ready-written sentence covering both cases |
 

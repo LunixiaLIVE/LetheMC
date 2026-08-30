@@ -3,6 +3,8 @@ package net.lunix.lethemc.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.lunix.lethemc.Config;
 import net.lunix.lethemc.Graveyard;
 import net.lunix.lethemc.Ledger;
@@ -15,12 +17,51 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 public final class LetheCommand {
 
     private LetheCommand() {}
+
+    /**
+     * Config keys, straight from the config itself.
+     *
+     * <p>Built from {@code asMap()} rather than a hand-written list, so a key added to the
+     * config can never go missing here -- two lists would drift the first time anyone forgot.
+     */
+    private static final SuggestionProvider<CommandSourceStack> CONFIG_KEYS =
+            (ctx, builder) -> SharedSuggestionProvider.suggest(Config.get().asMap().keySet(), builder);
+
+    /**
+     * Players currently in Purgatory.
+     *
+     * <p>The only sensible targets for status, resurrect and purge -- and vanilla's player
+     * argument cannot offer them, because a player in Purgatory is by definition offline.
+     * Without this an admin has to recall the exact spelling of a name they cannot see.
+     */
+    private static final SuggestionProvider<CommandSourceStack> IN_PURGATORY =
+            (ctx, builder) -> {
+                List<String> names = new ArrayList<>();
+                for (UUID uuid : Ledger.uuids()) {
+                    Ledger.Entry e = Ledger.get(uuid);
+                    if (e != null && !e.name.isEmpty()) names.add(e.name);
+                }
+                return SharedSuggestionProvider.suggest(names, builder);
+            };
+
+    /** Anyone who can be sent to Purgatory by hand: online players, plus those already in it. */
+    private static final SuggestionProvider<CommandSourceStack> LOCKABLE =
+            (ctx, builder) -> {
+                List<String> names = new ArrayList<>(List.of(ctx.getSource().getServer().getPlayerNames()));
+                for (UUID uuid : Ledger.uuids()) {
+                    Ledger.Entry e = Ledger.get(uuid);
+                    if (e != null && !e.name.isEmpty() && !names.contains(e.name)) names.add(e.name);
+                }
+                return SharedSuggestionProvider.suggest(names, builder);
+            };
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(build("lethemc"));
@@ -38,10 +79,12 @@ public final class LetheCommand {
                                 .then(Commands.literal("list").executes(ctx -> configList(ctx.getSource())))
                                 .then(Commands.literal("get")
                                         .then(Commands.argument("key", StringArgumentType.string())
+                                                .suggests(CONFIG_KEYS)
                                                 .executes(ctx -> configGet(ctx.getSource(),
                                                         StringArgumentType.getString(ctx, "key")))))
                                 .then(Commands.literal("set")
                                         .then(Commands.argument("key", StringArgumentType.string())
+                                                .suggests(CONFIG_KEYS)
                                                 .then(Commands.argument("value", StringArgumentType.greedyString())
                                                         .executes(ctx -> configSet(ctx.getSource(),
                                                                 StringArgumentType.getString(ctx, "key"),
@@ -50,25 +93,24 @@ public final class LetheCommand {
                         .then(Commands.literal("list").executes(ctx -> list(ctx.getSource())))
                         .then(Commands.literal("status")
                                 .then(Commands.argument("player", StringArgumentType.word())
+                                        .suggests(IN_PURGATORY)
                                         .executes(ctx -> status(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "player")))))
-                        .then(Commands.literal("pardon")
-                                .then(Commands.argument("player", StringArgumentType.word())
-                                        .executes(ctx -> pardon(ctx.getSource(),
-                                                StringArgumentType.getString(ctx, "player")))))
-                        // Same command, thematic name. One behaviour, two ways to reach it --
-                        // an admin who thinks in the mod's vocabulary should not have to
-                        // remember it is spelled "pardon".
+                        // One name for one behaviour. "pardon" was the older spelling and read
+                        // like a ban being lifted; the vocabulary here is resurrection.
                         .then(Commands.literal("resurrect")
                                 .then(Commands.argument("player", StringArgumentType.word())
-                                        .executes(ctx -> pardon(ctx.getSource(),
+                                        .suggests(IN_PURGATORY)
+                                        .executes(ctx -> resurrect(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "player")))))
                         .then(Commands.literal("purge")
                                 .then(Commands.argument("player", StringArgumentType.word())
+                                        .suggests(IN_PURGATORY)
                                         .executes(ctx -> forcePurge(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "player")))))
                         .then(Commands.literal("lock")
                                 .then(Commands.argument("player", StringArgumentType.word())
+                                        .suggests(LOCKABLE)
                                         .executes(ctx -> lock(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "player"), -1))
                                         .then(Commands.argument("minutes", StringArgumentType.word())
@@ -249,11 +291,11 @@ public final class LetheCommand {
             case ERASED -> "§8erased";
         });
         if (e.restorable()) {
-            // Surfaced so an admin can see whether a pardon would still restore them.
+            // Surfaced so an admin can see whether resurrection would still restore them.
             sb.append("\n§e grace: ").append(Messages.humanize(e.graceRemainingMillis(now)))
               .append(" left -- resurrection restores everything");
         } else {
-            sb.append("\n§8 grace expired -- pardon only lifts Purgatory");
+            sb.append("\n§8 grace expired -- resurrection only lifts Purgatory");
         }
         src.sendSuccess(() -> Component.literal(sb.toString()), false);
         return 1;
@@ -270,20 +312,20 @@ public final class LetheCommand {
      * <p>Safe to do here because a pardoned player is necessarily offline: Purgatory was
      * still running, so nothing has written them a fresh profile to be clobbered.
      */
-    private static int pardon(CommandSourceStack src, String name) {
+    private static int resurrect(CommandSourceStack src, String name) {
         UUID uuid = Ledger.findByName(name);
         if (uuid == null) {
             src.sendFailure(Component.literal(name + " is not in Purgatory."));
             return 0;
         }
-        // No pardoning yourself. Otherwise the penalty is optional for anyone holding the
+        // No resurrecting yourself. Otherwise the penalty is optional for anyone holding the
         // permission: die, pardon, keep everything, repeat. An admin can still be pardoned --
         // by another admin, or from the console -- so a genuinely bogus death is still
         // recoverable; it just stops being a decision they make alone about themselves.
         ServerPlayer caller = src.getPlayer();
         if (caller != null && caller.getUUID().equals(uuid)) {
             src.sendFailure(Component.literal(
-                    "§cYou cannot pardon yourself. Ask another admin, or use the server console."));
+                    "§cYou cannot resurrect yourself. Ask another admin, or use the server console."));
             return 0;
         }
 
