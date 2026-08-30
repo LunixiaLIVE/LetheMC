@@ -85,8 +85,8 @@ is irrelevant there. On a non-hardcore world it behaves normally and LetheMC doe
 | | |
 |---|---|
 | Minecraft | 26.2 |
-| Loader | Fabric 0.19.3+ |
-| Fabric API | 0.153.0+26.2 |
+| Loaders | **Fabric** 0.19.3+ · **NeoForge** 26.2.0.7+ |
+| Fabric API | 0.153.0+26.2 — *Fabric only; NeoForge needs nothing extra* |
 | Java | 21+ |
 | Side | Server only |
 
@@ -103,7 +103,7 @@ Hardcore has to be decided **before the world is generated**, so set it first.
    pause-when-empty-seconds=0
    hardcore=true            # only if you want hardcore; it is optional
    ```
-2. Put the LetheMC jar and **Fabric API** in `mods/`.
+2. Put the LetheMC jar in `mods/` (plus **Fabric API**, if you are on Fabric).
 3. **Start the server.** The world is created with whatever `hardcore` said, and you should see
    `LetheMC ready` in the log.
 4. Tune it to taste with `/lethemc admin config set …`, or edit `config/lethemc/config.json`.
@@ -119,7 +119,7 @@ restart to switch it on. Do the rest first.
    grace period is the only way back.
 2. **Stop the server.**
 3. Set `pause-when-empty-seconds=0` in `server.properties`.
-4. Put the LetheMC jar and **Fabric API** in `mods/`.
+4. Put the LetheMC jar in `mods/` (plus **Fabric API**, if you are on Fabric).
 5. **Start the server.** You should see `LetheMC ready`. Nobody's data is touched until they die.
 6. *Only if you want hardcore:* run **`/lethemc admin hardcore on`**, then **restart** the server.
    The `level.dat` change is saved immediately, but clients read the hardcore flag when they log
