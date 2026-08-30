@@ -19,7 +19,8 @@
     "VaultBlockEntityMixin",
     "GossipContainerMixin",
     "VillagerMixin",
-    "BlockEntityAttachMixin"
+    "BlockEntityAttachMixin",
+    "PrimaryLevelDataAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -16,6 +16,10 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.storage.PrimaryLevelData;
+import net.lunix.lethemc.mixin.PrimaryLevelDataAccessor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -90,6 +94,9 @@ public final class LetheCommand {
                                                                 StringArgumentType.getString(ctx, "key"),
                                                                 StringArgumentType.getString(ctx, "value")))))))
                         .then(Commands.literal("reload").executes(ctx -> reload(ctx.getSource())))
+                        .then(Commands.literal("hardcore")
+                                .then(Commands.literal("on").executes(ctx -> setHardcore(ctx.getSource(), true)))
+                                .then(Commands.literal("off").executes(ctx -> setHardcore(ctx.getSource(), false))))
                         .then(Commands.literal("list").executes(ctx -> list(ctx.getSource())))
                         .then(Commands.literal("status")
                                 .then(Commands.argument("player", StringArgumentType.word())
@@ -445,5 +452,58 @@ public final class LetheCommand {
         } catch (NumberFormatException e) {
             return -1;
         }
+    }
+
+    /**
+     * Converts the running world to or from hardcore.
+     *
+     * <p>Vanilla will not do this. {@code hardcore} in {@code server.properties} is read only
+     * when a world is created, and is silently ignored for one that already exists -- which is a
+     * safety property, not an oversight. Honouring that flag automatically would mean any server
+     * carrying a stale {@code hardcore=true} converted a long-running survival world on its next
+     * boot, changing death for every player, with nobody asked.
+     *
+     * <p>So it happens here instead: one world, one deliberate command, from an admin standing
+     * in it, written to the log with their name on it.
+     *
+     * <p>Enabling also sets difficulty to Hard and locks it, which is what hardcore means in
+     * vanilla. Disabling unlocks difficulty and leaves its value alone -- restoring a guess about
+     * what it used to be would be worse than leaving what is there.
+     */
+    private static int setHardcore(CommandSourceStack src, boolean on) {
+        if (!(LetheMC.server().getWorldData() instanceof PrimaryLevelData data)) {
+            src.sendFailure(Component.literal("§cThis world's data cannot be edited."));
+            return 0;
+        }
+        if (data.isHardcore() == on) {
+            src.sendSuccess(() -> Component.literal(
+                    "§7This world is already " + (on ? "hardcore" : "not hardcore") + ". Nothing changed."), false);
+            return 1;
+        }
+
+        LevelSettings old = ((PrimaryLevelDataAccessor) data).lethemc$settings();
+        LevelSettings.DifficultySettings ds = old.difficultySettings();
+        LevelSettings.DifficultySettings updated = new LevelSettings.DifficultySettings(
+                on ? Difficulty.HARD : ds.difficulty(),
+                on,
+                on || false);
+        ((PrimaryLevelDataAccessor) data).lethemc$setSettings(new LevelSettings(
+                old.levelName(), old.gameType(), updated, old.allowCommands(), old.dataConfiguration()));
+
+        // Write level.dat now. Left to the next autosave, a crash in between would lose the
+        // change and leave the admin believing a restart was all that remained.
+        LetheMC.server().saveEverything(true, true, true);
+
+        String who = src.getTextName();
+        LetheMC.LOGGER.warn("{} switched this world to hardcore={} via /lethemc admin hardcore. "
+                + "level.dat has been written; a restart is required for clients to see it.", who, on);
+
+        src.sendSuccess(() -> Component.literal(
+                "§6level.dat updated: §fhardcore = " + on + "\n"
+                + (on ? "§7Difficulty is now locked to Hard.\n" : "§7Difficulty is unlocked.\n")
+                + "§e⚠ Restart the server for this to take effect.§7 Clients read hardcore from the\n"
+                + "§7login packet, so hearts and the death screen will not change until players\n"
+                + "§7reconnect to a restarted server."), true);
+        return 1;
     }
 }

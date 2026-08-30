@@ -53,8 +53,7 @@ survival, not stuck spectating with all their gear.
 > is not hardcore, you get a console block explaining why — and confirming the mod is running
 > normally regardless. If you never wanted hardcore, it stays quiet.
 >
-> To actually get it: create a **new** world with `hardcore=true`, or edit `level.dat` with an
-> NBT editor.
+> To actually get it on an existing world, run **`/lethemc admin hardcore on`** — see below.
 
 ---
 
@@ -238,6 +237,7 @@ resurrect themselves.
 | `/lethemc admin config get <key>` | Read one setting |
 | `/lethemc admin config set <key> <value>` | Change one setting, saved immediately |
 | `/lethemc admin reload` | Re-read the config from disk |
+| `/lethemc admin hardcore <on\|off>` | Convert this world to or from hardcore. **Restart required** — see below |
 
 ### Who dies, and who can administer
 
@@ -266,6 +266,35 @@ Both are settable in-game and take effect immediately:
 > **Upgrading?** An existing `config.json` already has `bypassPermissionLevel` written out and
 > keeps whatever it says, so your current behaviour does not change. Only fresh installs get
 > the `-1` default. Set it explicitly if you want the new behaviour.
+
+---
+
+## Converting a world to hardcore
+
+```
+/lethemc admin hardcore on
+/lethemc admin hardcore off
+```
+
+Vanilla will not do this. `hardcore` in `server.properties` is read only when a world is
+*created* and silently ignored afterwards — so an existing world can never be converted by
+editing that file, no matter how many times you restart.
+
+This command edits `level.dat` directly and saves it immediately. Turning it **on** also sets
+difficulty to Hard and locks it, which is what hardcore means; turning it **off** unlocks
+difficulty and leaves its value alone.
+
+> [!IMPORTANT]
+> **A restart is required.** Clients read the hardcore flag from the login packet, so hearts and
+> the death screen keep looking the way they did until players reconnect to a restarted server.
+> The file is already correct — it is only the connected clients that are behind.
+
+It is deliberately a command rather than something driven by `server.properties`. Reading that
+file would mean any server carrying a stale `hardcore=true` converted a long-running survival
+world on its next boot, changing death for every player, without anyone being asked. This way it
+is one world, one deliberate act, recorded in the log with the name of whoever ran it.
+
+LetheMC does not need hardcore either way — this is here because vanilla offers no path at all.
 
 ---
 
