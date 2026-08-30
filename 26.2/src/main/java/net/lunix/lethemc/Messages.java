@@ -88,7 +88,7 @@ public final class Messages {
      * never promise to take something the config has switched off. An admin who disables
      * {@code wipe.stats} should not have players told their statistics are at risk.
      *
-     * <p>Read at call time, so {@code /lethe admin config set} and {@code reload} are reflected
+     * <p>Read at call time, so {@code /lethemc admin config set} and {@code reload} are reflected
      * immediately without touching the templates.
      *
      * @return e.g. "Inventory, Ender Chest, XP, Advancements & Statistics", or null if the

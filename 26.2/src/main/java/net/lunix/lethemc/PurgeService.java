@@ -15,7 +15,7 @@ import java.util.UUID;
  * the live directories at the tail of {@code PlayerList.remove} and hard-deleted from the
  * plot when the grace period ends. This class is the sweeper for the cases where a live file
  * is still sitting there and has to go regardless of the grace period -- an entombment that
- * kept failing, or {@code /lethe admin purge} forcing the issue.
+ * kept failing, or {@code /lethemc admin purge} forcing the issue.
  *
  * <p>Callers must not run it while the player is online: vanilla writes all three files on
  * removal, so a deletion before that point is simply undone.
@@ -30,7 +30,7 @@ public final class PurgeService {
      *
      * <ul>
      *   <li>whitelist.json -- on a whitelisted server, removing the entry means the player
-     *       can never rejoin. A 6 hour lockout silently becomes permanent, and it presents
+     *       can never rejoin. A 6 hour Purgatory silently becomes permanent, and it presents
      *       as a countdown bug rather than as what it is.</li>
      *   <li>ops.json -- would silently deop any staff member who dies.</li>
      *   <li>banned-players.json -- vanilla bans are unrelated to this mod.</li>

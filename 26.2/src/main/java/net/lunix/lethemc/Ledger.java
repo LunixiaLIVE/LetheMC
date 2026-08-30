@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Per-UUID lockout records. This is the mod's own ban list -- deliberately NOT the vanilla
+ * Per-UUID Purgatory records. This is the mod's own ban list -- deliberately NOT the vanilla
  * one (see DESIGN 3.4): the mod needs somewhere to keep wipePending / purgeAt / state
  * anyway, pardon has to be able to cancel a scheduled purge, and the rejoin message wants a
  * live countdown rather than vanilla's fixed expiry timestamp.
@@ -32,7 +32,7 @@ public final class Ledger {
             .resolve("lethemc").resolve("ledger.json");
     private static final Type MAP_TYPE = new TypeToken<Map<String, Entry>>() {}.getType();
 
-    /** Death screen is up; the lockout clock has NOT started yet. */
+    /** Death screen is up; the Purgatory clock has NOT started yet. */
     public static final String STATE_DYING = "DYING";
     /** Clock running. */
     public static final String STATE_LOCKED = "LOCKED";
@@ -62,9 +62,9 @@ public final class Ledger {
         public String name = "";
         public String state = STATE_DYING;
         public long deathAt;
-        /** Epoch millis the lockout clock started; 0 while DYING. */
-        public long lockoutStartsAt;
-        /** Duration snapshotted at death so later config edits don't re-time existing lockouts. */
+        /** Epoch millis the Purgatory clock started; 0 while DYING. */
+        public long purgatoryStartsAt;
+        /** Duration snapshotted at death so later config edits don't re-time existing Purgatory. */
         public long durationMillis;
         /** True from disconnect until the hard delete succeeds. The obligation, not the timer. */
         public boolean wipePending;
@@ -79,16 +79,16 @@ public final class Ledger {
         public String deathReason = "";
 
         public long unlockAt() {
-            return lockoutStartsAt <= 0 ? Long.MAX_VALUE : lockoutStartsAt + durationMillis;
+            return purgatoryStartsAt <= 0 ? Long.MAX_VALUE : purgatoryStartsAt + durationMillis;
         }
 
         public long remainingMillis(long now) {
-            if (lockoutStartsAt <= 0) return durationMillis;
+            if (purgatoryStartsAt <= 0) return durationMillis;
             return Math.max(0L, unlockAt() - now);
         }
 
         public boolean expired(long now) {
-            return lockoutStartsAt > 0 && now >= unlockAt();
+            return purgatoryStartsAt > 0 && now >= unlockAt();
         }
 
         /** Files are out of the live world directories and sitting in the graveyard. */

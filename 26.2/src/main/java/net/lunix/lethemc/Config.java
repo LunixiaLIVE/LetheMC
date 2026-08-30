@@ -16,9 +16,9 @@ import java.util.Map;
  * LetheMC configuration.
  *
  * <p>Enforces the design invariant from DESIGN section 4.4:
- * {@code lockout.minutes > wipe.graceMinutes}. Both are in minutes, so the default 5 minute
- * grace yields a 6 minute minimum lockout. This guarantees a hard delete can never still be
- * pending when the lockout expires.
+ * {@code purgatory.minutes > wipe.graceMinutes}. Both are in minutes, so the default 5 minute
+ * grace yields a minimum Purgatory of 6 minutes. This guarantees a hard delete can never still be
+ * pending when Purgatory expires.
  */
 public final class Config {
 
@@ -34,7 +34,7 @@ public final class Config {
     /**
      * How long, in minutes, an entombed player stays restorable before the hard delete.
      *
-     * <p>Minutes to match {@code lockout.minutes}, so the two values that must be compared
+     * <p>Minutes to match {@code purgatory.minutes}, so the two values that must be compared
      * (§4.4) are in the same unit and an admin can check the rule by eye.
      *
      * <p><b>No alias for the older {@code wipeGraceSeconds}/{@code wipeDelaySeconds} keys.</b>
@@ -105,9 +105,9 @@ public final class Config {
      */
     public int petsCheckIntervalTicks = 20;
 
-    // --- lockout ---
-    public int lockoutMinutes = 360;
-    public int lockoutDeathScreenSeconds = 15;
+    // --- Purgatory ---
+    public int purgatoryMinutes = 360;
+    public int purgatoryDeathScreenSeconds = 15;
 
     // --- messages ---
     // Does NOT claim the data is gone. At the moment this is shown the player has not even
@@ -144,7 +144,7 @@ public final class Config {
 
     // --- permissions ---
     // Two separate questions that used to share one answer. Welding them together forced a
-    // false choice: an admin could either run /lethe admin OR be able to die, never both -- so on
+    // false choice: an admin could either run /lethemc admin OR be able to die, never both -- so on
     // a server built around death having stakes, the person running it was silently exempt.
     //
     // Also note bypass and admin have different legal ranges. "Nobody is exempt" is a sensible
@@ -164,7 +164,7 @@ public final class Config {
     public int bypassPermissionLevel = -1;
 
     /**
-     * Who can run {@code /lethe admin ...}. {@code 0-4}, default 4.
+     * Who can run {@code /lethemc admin ...}. {@code 0-4}, default 4.
      *
      * <p>With the defaults you can resurrect other people and still die yourself, which is what
      * makes the self-pardon guard meaningful -- previously anyone who could pardon was immune
@@ -178,23 +178,23 @@ public final class Config {
         return INSTANCE;
     }
 
-    /** Minimum legal value for lockoutMinutes given the current grace period. */
-    public int minimumLockoutMinutes() {
+    /** Minimum legal value for purgatoryMinutes given the current grace period. */
+    public int minimumPurgatoryMinutes() {
         return wipeGraceMinutes + 1;
     }
 
-    /** Maximum legal value for wipeGraceMinutes given the current lockout. */
+    /** Maximum legal value for wipeGraceMinutes given the current Purgatory. */
     public int maximumWipeGraceMinutes() {
-        return lockoutMinutes - 1;
+        return purgatoryMinutes - 1;
     }
 
     /** @return null if valid, else a human-readable reason. */
     public String validate() {
-        if (lockoutMinutes <= wipeGraceMinutes) {
-            return "lockout.minutes must be greater than wipe.graceMinutes ("
-                    + wipeGraceMinutes + "). Try " + minimumLockoutMinutes() + " or higher.";
+        if (purgatoryMinutes <= wipeGraceMinutes) {
+            return "purgatory.minutes must be greater than wipe.graceMinutes ("
+                    + wipeGraceMinutes + "). Try " + minimumPurgatoryMinutes() + " or higher.";
         }
-        if (lockoutDeathScreenSeconds < 0) return "lockout.deathScreenSeconds cannot be negative.";
+        if (purgatoryDeathScreenSeconds < 0) return "purgatory.deathScreenSeconds cannot be negative.";
         if (wipeGraceMinutes < 1) return "wipe.graceMinutes must be at least 1.";
         if (petsCheckIntervalTicks < 1) return "wipe.petsCheckIntervalTicks must be at least 1.";
         if (bypassPermissionLevel < -1 || bypassPermissionLevel > 4) {
@@ -207,7 +207,7 @@ public final class Config {
     }
 
     // ------------------------------------------------------------------
-    // Key-based access, used by /lethe admin config get|set|list
+    // Key-based access, used by /lethemc admin config get|set|list
     // ------------------------------------------------------------------
 
     public Map<String, String> asMap() {
@@ -224,8 +224,8 @@ public final class Config {
         m.put("wipe.villagerReputation", String.valueOf(wipeVillagerReputation));
         m.put("wipe.villagers", String.valueOf(wipeVillagers));
         m.put("wipe.petsCheckIntervalTicks", String.valueOf(petsCheckIntervalTicks));
-        m.put("lockout.minutes", String.valueOf(lockoutMinutes));
-        m.put("lockout.deathScreenSeconds", String.valueOf(lockoutDeathScreenSeconds));
+        m.put("purgatory.minutes", String.valueOf(purgatoryMinutes));
+        m.put("purgatory.deathScreenSeconds", String.valueOf(purgatoryDeathScreenSeconds));
         m.put("message.death", messageDeath);
         m.put("message.rejoin", messageRejoin);
         m.put("message.deathScreen", messageDeathScreen);
@@ -243,7 +243,7 @@ public final class Config {
      * Applies a key change, validating the result before committing.
      * Validation runs on a copy so a rejected change leaves config untouched --
      * this is what enforces the DESIGN 4.4 constraint in BOTH directions
-     * (lowering lockout.minutes and raising wipe.delaySeconds each break it).
+     * (lowering purgatory.minutes and raising wipe.delaySeconds each break it).
      *
      * @return null on success, else the rejection reason.
      */
@@ -263,8 +263,8 @@ public final class Config {
                 case "wipe.villagerReputation" -> c.wipeVillagerReputation = parseBool(value);
                 case "wipe.villagers" -> c.wipeVillagers = parseBool(value);
                 case "wipe.petsCheckIntervalTicks" -> c.petsCheckIntervalTicks = Integer.parseInt(value);
-                case "lockout.minutes" -> c.lockoutMinutes = Integer.parseInt(value);
-                case "lockout.deathScreenSeconds" -> c.lockoutDeathScreenSeconds = Integer.parseInt(value);
+                case "purgatory.minutes" -> c.purgatoryMinutes = Integer.parseInt(value);
+                case "purgatory.deathScreenSeconds" -> c.purgatoryDeathScreenSeconds = Integer.parseInt(value);
                 case "message.death" -> c.messageDeath = value;
                 case "message.rejoin" -> c.messageRejoin = value;
                 case "message.deathScreen" -> c.messageDeathScreen = value;
@@ -314,8 +314,8 @@ public final class Config {
         c.wipeVillagerReputation = wipeVillagerReputation;
         c.wipeVillagers = wipeVillagers;
         c.petsCheckIntervalTicks = petsCheckIntervalTicks;
-        c.lockoutMinutes = lockoutMinutes;
-        c.lockoutDeathScreenSeconds = lockoutDeathScreenSeconds;
+        c.purgatoryMinutes = purgatoryMinutes;
+        c.purgatoryDeathScreenSeconds = purgatoryDeathScreenSeconds;
         c.messageDeath = messageDeath;
         c.messageRejoin = messageRejoin;
         c.messageDeathScreen = messageDeathScreen;
@@ -345,9 +345,9 @@ public final class Config {
             // Clamp rather than refuse to boot -- a server that won't start is worse
             // than one running a corrected value, but say so loudly.
             LetheMC.LOGGER.error("INVALID CONFIG: {}", problem);
-            int corrected = loaded.minimumLockoutMinutes();
-            LetheMC.LOGGER.error("Clamping lockout.minutes {} -> {}", loaded.lockoutMinutes, corrected);
-            loaded.lockoutMinutes = corrected;
+            int corrected = loaded.minimumPurgatoryMinutes();
+            LetheMC.LOGGER.error("Clamping purgatory.minutes {} -> {}", loaded.purgatoryMinutes, corrected);
+            loaded.purgatoryMinutes = corrected;
         }
 
         INSTANCE = loaded;

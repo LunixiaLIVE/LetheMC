@@ -17,9 +17,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Holds the player on the death screen by swallowing their respawn request.
  *
- * <p>They stay there for lockout.deathScreenSeconds (default 15) so they can read what
+ * <p>They stay there for purgatory.deathScreenSeconds (default 15) so they can read what
  * killed them, then the tick loop disconnects them. Clicking Disconnect themselves is
- * equally fine -- the lockout clock starts at whichever happens first.
+ * equally fine -- the Purgatory clock starts at whichever happens first.
  */
 @Mixin(ServerGamePacketListenerImpl.class)
 public class ServerGamePacketListenerMixin {

@@ -30,7 +30,7 @@ import java.util.UUID;
  * <ul>
  *   <li>The server is clean immediately. Nothing can read, back up, restore or resurrect a
  *       dead player's inventory out of {@code playerdata/}, because it is not there.</li>
- *   <li>{@code /lethe admin pardon} still restores everything for the full grace period, which
+ *   <li>{@code /lethemc admin pardon} still restores everything for the full grace period, which
  *       is the whole point of having one -- deaths caused by lag or a bad chunk load.</li>
  * </ul>
  *
@@ -260,7 +260,7 @@ public final class Graveyard {
     /**
      * Puts a pardoned player's files back where vanilla expects them (spec J).
      *
-     * <p>Safe because a pardon can only reach an offline player: the lockout is still running,
+     * <p>Safe because a pardon can only reach an offline player: Purgatory is still running,
      * so nothing has recreated the live files underneath us.
      */
     public static boolean restore(MinecraftServer server, UUID uuid, String name) {

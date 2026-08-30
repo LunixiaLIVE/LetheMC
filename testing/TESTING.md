@@ -86,4 +86,4 @@ print(d["XpLevel"], d.get("respawn"), d.get("equipment"))
 - A purge firing on schedule in a restarted JVM (lock re-acquisition and pardon
   after restart are both confirmed; the delete itself is not).
 - Entombment retry after a genuinely blocked move, and a failing restore.
-- `/nr admin purge`, `/nr admin lock`, `/nr status`, and bad-config clamping.
+- `/lethemc admin purge`, `/lethemc admin lock`, `/lethemc status`, and bad-config clamping.

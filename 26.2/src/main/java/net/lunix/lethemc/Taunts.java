@@ -17,7 +17,7 @@ import java.util.Random;
  * read after the second death. A rotating jab keeps it alive and gives the server a voice.
  *
  * <p>Plain text, one phrase per line, so a server owner can edit it without touching JSON and
- * without a restart -- {@code /lethe admin reload} re-reads it. The file IS the switch: empty it
+ * without a restart -- {@code /lethemc admin reload} re-reads it. The file IS the switch: empty it
  * (or delete every line) and the greeting is shown on its own. That is deliberately the only
  * control; a separate enable flag would be one more thing to explain and to get out of sync.
  */
@@ -73,7 +73,7 @@ public final class Taunts {
         out.add("# returns from Purgatory with nothing. Picked at random.");
         out.add("#");
         out.add("# Lines starting with # are ignored. Remove every phrase to show the");
-        out.add("# greeting on its own. Reloaded by /lethe admin reload -- no restart needed.");
+        out.add("# greeting on its own. Reloaded by /lethemc admin reload -- no restart needed.");
         out.add("");
         out.addAll(DEFAULTS);
         try {

@@ -17,7 +17,7 @@ pause-when-empty-seconds=0
 ```
 
 **LetheMC will refuse to run if this is anything else.** You will see a large `ERROR` block
-in the console at startup, and `/lethe info` will report the mod as disabled.
+in the console at startup, and `/lethemc info` will report the mod as disabled.
 
 Why: a server with this setting stops ticking once the last player leaves — which is exactly
 when a player who just died has left. The wipe would silently never happen, players would
@@ -52,20 +52,20 @@ back and clears its records on the next start, so nobody is left in limbo.
 1. **Nothing drops.** There is no body to loot and no items on the ground.
 2. The death screen stays up for 15 seconds so they can read what killed them. It reads
    *"...& sent to Purgatory"*.
-3. They are disconnected and enter **Purgatory** for `lockout.minutes` (6 hours by default).
+3. They are disconnected and enter **Purgatory** for `purgatory.minutes` (6 hours by default).
 4. Their inventory, ender chest, XP, advancements and statistics are taken.
 5. Rejoining during Purgatory shows how long until they may return, and whether resurrection
    is still possible.
 6. When Purgatory ends they are **reincarnated** — a brand-new player, greeted as such.
    The animals they tamed are destroyed at the same moment.
 
-The lockout is **real time**. It keeps counting while the server is offline — a 6 hour
-lockout started at 22:00 has expired by 04:00 whether or not the server ran overnight.
+The Purgatory is **real time**. It keeps counting while the server is offline — a 6 hour
+Purgatory started at 22:00 has expired by 04:00 whether or not the server ran overnight.
 
 ### Resurrection
 
 For `wipe.graceMinutes` after a death (5 by default) the player's belongings still exist, and
-`/lethe admin pardon <player>` — or `/lethe admin resurrect <player>`, the same command — gives back
+`/lethemc admin pardon <player>` — or `/lethemc admin resurrect <player>`, the same command — gives back
 **everything**: inventory, worn armour, ender chest, XP, advancements, stats. They rejoin and
 are placed back in the world at their bed or spawn, alive, without even seeing a death screen.
 
@@ -73,7 +73,7 @@ Use it for deaths that were not the player's fault: a lag spike, a bad chunk loa
 mistake.
 
 After that window the belongings are gone for good. The same command still works, but it only
-releases them from Purgatory early — they return with nothing. `/lethe admin status <player>`
+releases them from Purgatory early — they return with nothing. `/lethemc admin status <player>`
 tells you which outcome you will get **before** you decide.
 
 Admins **cannot resurrect themselves**, only other people. Otherwise the penalty is optional for
@@ -89,7 +89,7 @@ than a bug:
 > *Maybe this time you won't be so careless.*
 
 That second line is picked at random from `config/lethemc/reincarnation.txt` — plain text, one
-phrase per line, ten included. Edit it and run `/lethe admin reload`; no restart. Remove every
+phrase per line, ten included. Edit it and run `/lethemc admin reload`; no restart. Remove every
 phrase and the greeting appears on its own.
 
 ### Your animals
@@ -159,14 +159,14 @@ Three rules keep it from emptying your village:
 
 ## Commands
 
-Root command is `/lethemc`, aliased to `/lethe`.
+Root command is `/lethemc`, aliased to `/lethemc`.
 
 ### Everyone
 
 | Command | Does |
 |---|---|
-| `/lethe` or `/lethe info` | What happens when you die, current durations |
-| `/lethe status` | Your own lockout, if any |
+| `/lethemc` or `/lethemc info` | What happens when you die, current durations |
+| `/lethemc status` | Your own Purgatory, if any |
 
 ### Admin
 
@@ -176,16 +176,16 @@ resurrect themselves.
 
 | Command | Does |
 |---|---|
-| `/lethe admin list` | Everyone currently locked out |
-| `/lethe admin status <player>` | Their lockout, where their data is, whether a pardon still restores it |
-| `/lethe admin pardon <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot pardon yourself** — ask another admin or use the console |
-| `/lethe admin resurrect <player>` | Alias for `pardon` — same command, thematic name |
-| `/lethe admin purge <player>` | Erase their data now, skipping the grace period |
-| `/lethe admin lock <player> [minutes]` | Lock someone out manually |
-| `/lethe admin config list` | Show all settings |
-| `/lethe admin config get <key>` | Read one setting |
-| `/lethe admin config set <key> <value>` | Change one setting, saved immediately |
-| `/lethe admin reload` | Re-read the config from disk |
+| `/lethemc admin list` | Everyone currently in Purgatory |
+| `/lethemc admin status <player>` | Their Purgatory, where their data is, whether a pardon still restores it |
+| `/lethemc admin pardon <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot pardon yourself** — ask another admin or use the console |
+| `/lethemc admin resurrect <player>` | Alias for `pardon` — same command, thematic name |
+| `/lethemc admin purge <player>` | Erase their data now, skipping the grace period |
+| `/lethemc admin lock <player> [minutes]` | Send someone to Purgatory manually |
+| `/lethemc admin config list` | Show all settings |
+| `/lethemc admin config get <key>` | Read one setting |
+| `/lethemc admin config set <key> <value>` | Change one setting, saved immediately |
+| `/lethemc admin reload` | Re-read the config from disk |
 
 ### Who dies, and who can administer
 
@@ -200,15 +200,15 @@ having stakes.
 | Builders immune, moderators mortal | `2` | `3` |
 
 The default means you can resurrect other people and still face Purgatory yourself, which is
-usually what you want on a server whose whole premise is that death costs something. `/lethe info`
+usually what you want on a server whose whole premise is that death costs something. `/lethemc info`
 tells players when nobody is exempt, so it is visible rather than assumed.
 
 Both are settable in-game and take effect immediately:
 
 ```
-/lethe admin config set bypass.permissionLevel -1
-/lethe admin config set admin.permissionLevel 3
-/lethe admin reload
+/lethemc admin config set bypass.permissionLevel -1
+/lethemc admin config set admin.permissionLevel 3
+/lethemc admin reload
 ```
 
 > **Upgrading?** An existing `config.json` already has `bypassPermissionLevel` written out and
@@ -220,7 +220,7 @@ Both are settable in-game and take effect immediately:
 ## Config
 
 `config/lethemc/config.json`, created on first start. Every key is also settable in-game
-with `/lethe admin config set`.
+with `/lethemc admin config set`.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -236,17 +236,17 @@ with `/lethe admin config set`.
 | `wipe.villagerReputation` | `true` | Villagers forget what they thought of a past life |
 | `wipe.villagers` | `true` | Destroy villagers whose only customers have died — **see the warning below** |
 | `wipe.petsCheckIntervalTicks` | `20` | How often to look for animals belonging to an ended life |
-| `lockout.minutes` | `360` | Lockout length in real-time minutes (6 hours) |
-| `lockout.deathScreenSeconds` | `15` | How long the death screen is held |
+| `purgatory.minutes` | `360` | Purgatory length in real-time minutes (6 hours) |
+| `purgatory.deathScreenSeconds` | `15` | How long the death screen is held |
 | `message.death` | — | Shown on the disconnect that follows a death |
 | `message.rejoin` | — | Shown when someone in Purgatory tries to join |
 | `message.deathScreen` | — | The one line of the in-game death screen a server can control. **Must stay one line** — see below |
 | `message.reincarnation` | — | Greeting when Purgatory ends |
 | `bypass.permissionLevel` | `-1` | Who is exempt from dying. `-1` nobody, `0` everyone, `1`-`4` that op level and above |
-| `admin.permissionLevel` | `4` | Who can run `/lethe admin ...`. `0`-`4` |
+| `admin.permissionLevel` | `4` | Who can run `/lethemc admin ...`. `0`-`4` |
 
-**`lockout.minutes` must be greater than `wipe.graceMinutes`.** Both are in minutes, so at the
-defaults that means a minimum lockout of 6 minutes. Values that break the rule are rejected with a message
+**`purgatory.minutes` must be greater than `wipe.graceMinutes`.** Both are in minutes, so at the
+defaults that means a minimum Purgatory of 6 minutes. Values that break the rule are rejected with a message
 telling you the minimum, and a bad config file is corrected on load rather than refusing to
 boot.
 
@@ -257,7 +257,7 @@ boot.
 | `%player%` | Player name |
 | `%time_remaining%` | `2h 14m` |
 | `%time_remaining_short%` | `00:02:14:33` — `DD:HH:MM:SS` |
-| `%unlock_time%` | Wall-clock time the lockout ends, in the **server's** timezone |
+| `%unlock_time%` | Wall-clock time the Purgatory ends, in the **server's** timezone |
 | `%death_reason%` | The vanilla death message |
 | `%grace_remaining%` | Time a pardon still restores everything, or `expired` |
 | `%grace_remaining_short%` | `00:00:04:12` — `DD:HH:MM:SS` |

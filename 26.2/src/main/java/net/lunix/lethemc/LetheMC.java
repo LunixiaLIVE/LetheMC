@@ -96,7 +96,7 @@ public class LetheMC implements ModInitializer {
     /**
      * Set when a startup precondition fails. The mod then does NOTHING -- deaths are vanilla,
      * joins are unrestricted, no files move. Half-working is the one outcome worse than off:
-     * taking a player's inventory and then failing to manage the lockout is strictly worse
+     * taking a player's inventory and then failing to manage Purgatory is strictly worse
      * than never having touched them.
      */
     private static boolean standingDown = false;
@@ -119,8 +119,8 @@ public class LetheMC implements ModInitializer {
             Taunts.load();
             Incarnations.load();
             recover(s);
-            LOGGER.info("LetheMC ready -- lockout {} min, grace {} min",
-                    Config.get().lockoutMinutes, Config.get().wipeGraceMinutes);
+            LOGGER.info("LetheMC ready -- Purgatory {} min, grace {} min",
+                    Config.get().purgatoryMinutes, Config.get().wipeGraceMinutes);
         });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(s -> {
@@ -187,7 +187,7 @@ public class LetheMC implements ModInitializer {
      * leaves. The hard delete runs on the tick loop -- and the moment it is due is precisely
      * the moment a dying player has just left, very often as the last player online. So on a
      * pausing server the purge silently never runs: the player's files sit in the graveyard,
-     * the lockout expires with the wipe still pending, and the death penalty quietly does not
+     * Purgatory expires with the wipe still pending, and the death penalty quietly does not
      * happen. Verified in testing on 2026-08-28.
      *
      * <p>LetheMC deliberately does NOT override the setting. It is a real setting an admin
@@ -217,7 +217,7 @@ public class LetheMC implements ModInitializer {
      * Refuse to operate, loudly, and hand back anything already taken.
      *
      * <p>Undoing pending state matters: if the admin enables the pause while players are
-     * mid-lockout, going inert without restoring would strand their files in the graveyard
+     * mid-Purgatory, going inert without restoring would strand their files in the graveyard
      * with nothing left to ever purge or return them. Backing out leaves the world in a
      * consistent vanilla state.
      */
@@ -262,7 +262,7 @@ public class LetheMC implements ModInitializer {
         return standDownReason;
     }
 
-    /** Re-run the precondition check, so /lethe admin reload can pick up a fix. */
+    /** Re-run the precondition check, so /lethemc admin reload can pick up a fix. */
     public static void recheckPreconditions(MinecraftServer s) {
         String problem = checkPreconditions(s);
         if (problem == null && standingDown) {
@@ -275,7 +275,7 @@ public class LetheMC implements ModInitializer {
     }
 
     // ------------------------------------------------------------------
-    // Death -> lockout
+    // Death -> Purgatory
     // ------------------------------------------------------------------
 
     private static void onPlayerDeath(ServerPlayer player) {
@@ -286,10 +286,10 @@ public class LetheMC implements ModInitializer {
         e.name = player.getName().getString();
         e.state = Ledger.STATE_DYING;
         e.deathAt = now;
-        e.lockoutStartsAt = 0L; // stamped when the death screen ends or they disconnect
-        // Snapshot the duration so a later `config set lockout.minutes` doesn't
+        e.purgatoryStartsAt = 0L; // stamped when the death screen ends or they disconnect
+        // Snapshot the duration so a later `config set purgatory.minutes` doesn't
         // retroactively re-time anyone already locked out.
-        e.durationMillis = cfg.lockoutMinutes * 60_000L;
+        e.durationMillis = cfg.purgatoryMinutes * 60_000L;
         e.graceMillis = cfg.wipeGraceMinutes * 60_000L; // snapshotted for the same reason
         e.wipePending = false;
         e.graveyardAt = 0L;
@@ -302,11 +302,11 @@ public class LetheMC implements ModInitializer {
         }
 
         Ledger.put(player.getUUID(), e);
-        LOGGER.info("{} died -- lockout {} min pending", e.name, cfg.lockoutMinutes);
+        LOGGER.info("{} died -- Purgatory {} min pending", e.name, cfg.purgatoryMinutes);
     }
 
     /**
-     * Stamps the lockout start. Called for any disconnect; only acts if the player was
+     * Stamps the Purgatory start. Called for any disconnect; only acts if the player was
      * still in the DYING state, i.e. the death screen was up when they left.
      *
      * <p>The clock starts at whichever came first, the death screen timing out or the
@@ -315,20 +315,20 @@ public class LetheMC implements ModInitializer {
      */
     private static void onDisconnect(ServerPlayer player) {
         if (player == null) return;
-        startLockout(player.getUUID());
+        startPurgatory(player.getUUID());
     }
 
     /**
      * DYING -> LOCKED. Idempotent, because two different hooks race to call it and either
      * order is fine: this event, and the tail of PlayerList.remove.
      */
-    private static void startLockout(UUID uuid) {
+    private static void startPurgatory(UUID uuid) {
         Ledger.Entry e = Ledger.get(uuid);
         if (e == null || !Ledger.STATE_DYING.equals(e.state)) return;
 
         long now = System.currentTimeMillis();
         e.state = Ledger.STATE_LOCKED;
-        e.lockoutStartsAt = now;
+        e.purgatoryStartsAt = now;
         e.wipePending = true;
         e.entombRetryAt = now; // eligible immediately; the remove hook normally beats the tick
         Ledger.put(uuid, e);
@@ -351,7 +351,7 @@ public class LetheMC implements ModInitializer {
 
         // Belt and braces: if the Fabric disconnect event has not fired yet, do the state
         // transition here so entombment is never deferred a tick on hook ordering alone.
-        startLockout(uuid);
+        startPurgatory(uuid);
 
         Ledger.Entry e = Ledger.get(uuid);
         if (e == null || !e.wipePending || e.entombed()) return;
@@ -393,7 +393,7 @@ public class LetheMC implements ModInitializer {
         }
 
         // 1. Kick anyone whose death screen has run its course.
-        long holdMillis = cfg.lockoutDeathScreenSeconds * 1000L;
+        long holdMillis = cfg.purgatoryDeathScreenSeconds * 1000L;
         for (ServerPlayer player : s.getPlayerList().getPlayers().toArray(new ServerPlayer[0])) {
             Ledger.Entry e = Ledger.get(player.getUUID());
             if (e == null || !Ledger.STATE_DYING.equals(e.state)) continue;
@@ -428,7 +428,7 @@ public class LetheMC implements ModInitializer {
             }
         }
 
-        // 4. Drop entries whose lockout has expired and whose purge is done.
+        // 4. Drop entries whose Purgatory has expired and whose purge is done.
         for (UUID uuid : Ledger.uuids()) {
             Ledger.Entry e = Ledger.get(uuid);
             if (e == null || e.wipePending) continue;
@@ -458,7 +458,7 @@ public class LetheMC implements ModInitializer {
      * The remains are gone for good. Ends the old life at that same instant.
      *
      * <p>Rotating here rather than only when Purgatory expires closes a window. Between the
-     * hard delete and the lockout ending, a player is offline for potentially hours while
+     * hard delete and the Purgatory ending, a player is offline for potentially hours while
      * their tamed animals are still theirs -- long enough for a friend to empty their chest
      * donkey and hand it all back afterwards, which is precisely the loophole that destroying
      * the animals exists to shut. Once the belongings are destroyed, everything of that life
@@ -477,7 +477,7 @@ public class LetheMC implements ModInitializer {
      *
      * <p>Three jobs: re-take the file locks (they died with the last JVM), entomb anyone the
      * shutdown caught mid-flight, and run any hard delete whose grace period elapsed while
-     * the server was off. Real-time lockouts keep running across a restart, so grace periods
+     * the server was off. Real-time Purgatory keep running across a restart, so grace periods
      * have to as well or a restart would quietly extend everyone's mercy window.
      */
     private static void recover(MinecraftServer s) {
@@ -494,7 +494,7 @@ public class LetheMC implements ModInitializer {
             // deathScreenSeconds.
             if (Ledger.STATE_DYING.equals(e.state)) {
                 e.state = Ledger.STATE_LOCKED;
-                e.lockoutStartsAt = e.deathAt;
+                e.purgatoryStartsAt = e.deathAt;
                 e.wipePending = true;
                 e.entombRetryAt = now;
                 Ledger.put(uuid, e);
@@ -532,7 +532,7 @@ public class LetheMC implements ModInitializer {
      * The death-screen line, built from {@code message.deathScreen}.
      *
      * <p>Called while the player is still inside {@code die()}, so there is no ledger entry
-     * yet -- {@code %time_remaining%} therefore reflects the configured lockout rather than a
+     * yet -- {@code %time_remaining%} therefore reflects the configured Purgatory rather than a
      * live countdown. That is the right value anyway: the clock has not started.
      *
      * <p>Falls through to the vanilla message untouched when the mod is inert or the player is
@@ -548,7 +548,7 @@ public class LetheMC implements ModInitializer {
         String out = template
                 .replace("%death_reason%", reason)
                 .replace("%player%", player.getName().getString())
-                .replace("%time_remaining%", Messages.humanize(Config.get().lockoutMinutes * 60_000L))
+                .replace("%time_remaining%", Messages.humanize(Config.get().purgatoryMinutes * 60_000L))
                 .replace("%grace_remaining%", Messages.humanize(Config.get().wipeGraceMinutes * 60_000L));
         return Component.literal(out);
     }
@@ -593,7 +593,7 @@ public class LetheMC implements ModInitializer {
      * Retires a PARDONED entry for a player who came back alive.
      *
      * <p>Normally the entry is spent by the respawn that follows a pardon. But a player
-     * pardoned after {@code /lethe admin lock} was never dead, so no respawn is coming and the
+     * pardoned after {@code /lethemc admin lock} was never dead, so no respawn is coming and the
      * entry would sit in the ledger forever waiting for one.
      */
     private static void retirePardonIfAlive(ServerPlayer player) {
@@ -716,7 +716,7 @@ public class LetheMC implements ModInitializer {
      *
      * <p>The countdown is computed here rather than stored, so it is accurate on every
      * attempt. This is also the backstop that stops anyone being admitted mid-purge --
-     * unreachable in normal operation now that the config constraint guarantees a lockout
+     * unreachable in normal operation now that the config constraint guarantees a Purgatory
      * always outlasts the purge delay, but kept for restart recovery and failed deletes.
      */
     public static Component checkLogin(UUID uuid, String name) {
@@ -790,7 +790,7 @@ public class LetheMC implements ModInitializer {
     }
 
     /**
-     * Allowed to run {@code /lethe admin ...}.
+     * Allowed to run {@code /lethemc admin ...}.
      *
      * <p>Deliberately a separate question from {@link #isExempt}. While the two shared one
      * setting an admin could either administer or be mortal, never both -- so on a server whose

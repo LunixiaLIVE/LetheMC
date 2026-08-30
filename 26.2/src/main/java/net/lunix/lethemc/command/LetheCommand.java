@@ -24,8 +24,7 @@ public final class LetheCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(build("lethemc"));
-        dispatcher.register(build("lethe"));
-        dispatcher.register(build("le"));
+        dispatcher.register(build("lmc"));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> build(String root) {
@@ -99,7 +98,7 @@ public final class LetheCommand {
 
         String stakes = Messages.stakes();
         sb.append("§fWhen you die you are sent to §5Purgatory§f for §e")
-          .append(Messages.humanize(c.lockoutMinutes * 60_000L)).append("§f.\n");
+          .append(Messages.humanize(c.purgatoryMinutes * 60_000L)).append("§f.\n");
         sb.append("§7You cannot rejoin until it ends. The clock is real time --\n");
         sb.append("§7it keeps running while the server is offline.\n");
 
@@ -120,7 +119,7 @@ public final class LetheCommand {
             sb.append("§7 - released early by an admin\n");
             sb.append("§7 - or when the time runs out\n");
         }
-        sb.append("§7The death screen stays up for ").append(c.lockoutDeathScreenSeconds)
+        sb.append("§7The death screen stays up for ").append(c.purgatoryDeathScreenSeconds)
           .append("s so you can see what killed you.");
         // Worth stating out loud on a server that has chosen it: the stakes are the same for
         // everyone, which is exactly the thing players assume is untrue of the person running it.
@@ -134,7 +133,7 @@ public final class LetheCommand {
     private static int selfStatus(CommandSourceStack src) {
         ServerPlayer p = src.getPlayer();
         if (p == null) {
-            src.sendFailure(Component.literal("Only a player can use this. Try /lethe admin status <player>."));
+            src.sendFailure(Component.literal("Only a player can use this. Try /lethemc admin status <player>."));
             return 0;
         }
         Ledger.Entry e = Ledger.get(p.getUUID());
@@ -204,14 +203,14 @@ public final class LetheCommand {
     }
 
     // ------------------------------------------------------------------
-    // Admin: lockouts
+    // Admin: Purgatory
     // ------------------------------------------------------------------
 
     private static int list(CommandSourceStack src) {
         long now = System.currentTimeMillis();
         if (LetheMC.isStandingDown()) {
             src.sendFailure(Component.literal("§cLetheMC is DISABLED -- " + LetheMC.standDownReason()
-                    + "\n§7No lockouts are being enforced."));
+                    + "\n§7Nobody is being held in Purgatory."));
             return 0;
         }
         if (Ledger.all().isEmpty()) {
@@ -254,21 +253,21 @@ public final class LetheCommand {
             sb.append("\n§e grace: ").append(Messages.humanize(e.graceRemainingMillis(now)))
               .append(" left -- resurrection restores everything");
         } else {
-            sb.append("\n§8 grace expired -- pardon only lifts the lockout");
+            sb.append("\n§8 grace expired -- pardon only lifts Purgatory");
         }
         src.sendSuccess(() -> Component.literal(sb.toString()), false);
         return 1;
     }
 
     /**
-     * Pardon lifts the lockout AND cancels the pending hard delete.
+     * Pardon lifts Purgatory AND cancels the pending hard delete.
      *
      * <p>Inside the grace period that means full restoration: the files are lifted back out
      * of the graveyard and put where vanilla expects them. After it, they are gone and
      * nothing can bring them back -- so the feedback has to say which of the two happened,
      * or the admin has no way to tell.
      *
-     * <p>Safe to do here because a pardoned player is necessarily offline: the lockout was
+     * <p>Safe to do here because a pardoned player is necessarily offline: Purgatory was
      * still running, so nothing has written them a fresh profile to be clobbered.
      */
     private static int pardon(CommandSourceStack src, String name) {
@@ -308,7 +307,7 @@ public final class LetheCommand {
             // would strand the files with nothing left pointing at them.
             src.sendFailure(Component.literal(
                     "§cCould not restore " + e.name + " -- files left in the graveyard, see log. "
-                    + "Their lockout is unchanged; try again."));
+                    + "Their Purgatory is unchanged; try again."));
             return 0;
         }
 
@@ -357,12 +356,12 @@ public final class LetheCommand {
 
     private static int lock(CommandSourceStack src, String name, int minutes) {
         Config cfg = Config.get();
-        if (minutes < 0) minutes = cfg.lockoutMinutes;
+        if (minutes < 0) minutes = cfg.purgatoryMinutes;
 
-        // Manual locks take the same floor as the config: a lockout must always outlast
+        // Manual locks take the same floor as the config: Purgatory must always outlast
         // the grace period, or the hard delete would still be pending when the ban lifts.
         if (minutes <= cfg.wipeGraceMinutes) {
-            final int min = cfg.minimumLockoutMinutes();
+            final int min = cfg.minimumPurgatoryMinutes();
             src.sendFailure(Component.literal("§cDuration must be greater than wipe.graceMinutes ("
                     + cfg.wipeGraceMinutes + "). Try " + min + " or higher."));
             return 0;
@@ -380,7 +379,7 @@ public final class LetheCommand {
         e.name = target.getName().getString();
         e.state = Ledger.STATE_LOCKED;
         e.deathAt = now;
-        e.lockoutStartsAt = now;
+        e.purgatoryStartsAt = now;
         e.durationMillis = minutes * 60_000L;
         e.graceMillis = cfg.wipeGraceMinutes * 60_000L;
         e.wipePending = true;

@@ -26,7 +26,7 @@ public class PlayerListMixin {
      * the number is correct on every single attempt.
      */
     @Inject(method = "canPlayerLogin", at = @At("HEAD"), cancellable = true)
-    private void lethemc$checkLockout(SocketAddress address, NameAndId profile,
+    private void lethemc$checkPurgatory(SocketAddress address, NameAndId profile,
                                         CallbackInfoReturnable<Component> cir) {
         Component reason = LetheMC.checkLogin(profile.id(), profile.name());
         if (reason != null) {

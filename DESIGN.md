@@ -12,17 +12,17 @@
 |---|---|
 | **A** | Server-side only. No client install required. |
 | **B** | Death costs the player everything. Nothing drops on the ground. |
-| **C** | Death = lockout for a configured number of **real-time minutes**. Wall-clock only — no Minecraft time, no game ticks. |
-| **D** | Join attempt during lockout shows a **live `DD:HH:MM:SS` countdown** of time remaining — a duration, never a wall-clock timestamp (§3.5). |
+| **C** | Death = Purgatory for a configured number of **real-time minutes**. Wall-clock only — no Minecraft time, no game ticks. |
+| **D** | Join attempt during Purgatory shows a **live `DD:HH:MM:SS` countdown** of time remaining — a duration, never a wall-clock timestamp (§3.5). |
 | **E** | Open **player** commands to view the setup + `admin` subcommand for config and hot reload. |
-| **F** | Death screen held **X seconds (default 15)** so the player sees what killed them. Lockout timer starts at **screen expiry OR manual disconnect, whichever comes first.** |
+| **F** | Death screen held **X seconds (default 15)** so the player sees what killed them. Purgatory timer starts at **screen expiry OR manual disconnect, whichever comes first.** |
 | **G** | **Total UUID purge** — everything associated with the player is erased except their ban-list entry, whitelist entry, and op status. Includes stats and advancements. |
 | **H** | Files leave the live world **immediately** on removal (entombed in a graveyard), and are hard-deleted after a **grace period (default 5 min)**. |
-| **I** | **Lockout duration must always exceed the grace period.** Enforced by config validation — the hard delete can never outlive the ban. |
-| **J** | `/lethe admin pardon` **cancels both the lockout and any pending purge** — pardoning inside the grace period restores the player's files out of the graveyard **and carries their inventory + XP through the respawn that follows** (§4.10). |
+| **I** | **Purgatory duration must always exceed the grace period.** Enforced by config validation — the hard delete can never outlive the ban. |
+| **J** | `/lethemc admin pardon` **cancels both the Purgatory and any pending purge** — pardoning inside the grace period restores the player's files out of the graveyard **and carries their inventory + XP through the respawn that follows** (§4.10). |
 | **K** | The mod **refuses to run** if `pause-when-empty-seconds > 0`, because the purge would silently never fire (§4.11). |
 | **L** | Composes with vanilla **hardcore**: the spectator lock is bypassed, not disabled, and a resurrected player never becomes a spectator (§4.12). |
-| **M** | The lockout is called **Purgatory**; leaving it is **Resurrection** (intact) or **Reincarnation** (empty). Stakes are always named plainly as *Inventory, Ender Chest & XP* (§4.14). |
+| **M** | The Purgatory is called **Purgatory**; leaving it is **Resurrection** (intact) or **Reincarnation** (empty). Stakes are always named plainly as *Inventory, Ender Chest & XP* (§4.14). |
 | **N** | Reincarnation **destroys the animals you tamed**, and they are untouchable by anyone while you are in Purgatory (§11). |
 
 ---
@@ -39,7 +39,7 @@ t=0..15s   DEATH SCREEN
            └─ player may disconnect manually at any point
 
 t=T        T = min(deathScreenSeconds elapsed, manual disconnect)
-           ├─ lockoutStartsAt = T, state=LOCKED, wipePending=true
+           ├─ purgatoryStartsAt = T, state=LOCKED, wipePending=true
            └─ if still connected: disconnect with countdown message
 
 t=T        ENTOMB  (tail of PlayerList.remove — same tick, not a timer)
@@ -77,12 +77,12 @@ So the two jobs the delay was conflating get split:
 ## 3. Locked Decisions
 
 ### 3.1 Timer start (**F**)
-`lockoutStartsAt = min(deathAt + deathScreenSeconds, manualDisconnectAt)`.
+`purgatoryStartsAt = min(deathAt + deathScreenSeconds, manualDisconnectAt)`.
 
-Ledger entry is written at **t=0** (state `DYING`) so a crash during the death screen still bans them; `lockoutStartsAt` is stamped at **t=T**.
+Ledger entry is written at **t=0** (state `DYING`) so a crash during the death screen still bans them; `purgatoryStartsAt` is stamped at **t=T**.
 
-- **Crash between t=0 and t=T:** on restart a `DYING` entry with no start time falls back to `lockoutStartsAt = deathAt`. Errs in the player's favor by at most `deathScreenSeconds`.
-- **Minor, accepted:** disconnecting early starts the timer early, so a rage-quit shaves up to 15s off the lockout. Noise against a 6-hour default.
+- **Crash between t=0 and t=T:** on restart a `DYING` entry with no start time falls back to `purgatoryStartsAt = deathAt`. Errs in the player's favor by at most `deathScreenSeconds`.
+- **Minor, accepted:** disconnecting early starts the timer early, so a rage-quit shaves up to 15s off the Purgatory. Noise against a 6-hour default.
 
 ### 3.2 In-memory keep-inventory override
 The mod behaves as if `keepInventory=true` regardless of the gamerule or server.properties. **The gamerule itself is never modified.** Purely to stop drops — items are destroyed at purge time.
@@ -90,18 +90,18 @@ The mod behaves as if `keepInventory=true` regardless of the gamerule or server.
 ### 3.3 Custom ban ledger, keyed by UUID
 Still a custom ledger rather than the vanilla ban list — but note that dropping the MC-days clock removed one of the two original justifications (the vanilla list stores absolute dates and literally could not express "3 Minecraft days"). With real-time only, a vanilla timed ban *could* express the duration. The remaining reasons still hold and are sufficient:
 
-1. **The mod needs its own per-player state anyway** — `wipePending`, `purgeAt`, `state`, `durationSnapshot` have nowhere to live in the vanilla ban list. Once that store exists, splitting the lockout across two systems adds desync risk for nothing.
-2. **Pardon must cancel the purge (§4.6, J).** If lockouts lived in the vanilla ban list, an admin could clear one with vanilla `/pardon` and leave a scheduled purge dangling — the player returns, then gets wiped anyway.
+1. **The mod needs its own per-player state anyway** — `wipePending`, `purgeAt`, `state`, `durationSnapshot` have nowhere to live in the vanilla ban list. Once that store exists, splitting the Purgatory across two systems adds desync risk for nothing.
+2. **Pardon must cancel the purge (§4.6, J).** If Purgatory lived in the vanilla ban list, an admin could clear one with vanilla `/pardon` and leave a scheduled purge dangling — the player returns, then gets wiped anyway.
 3. **Live countdown formatting.** Vanilla renders a fixed expiry timestamp; **D** wants `2h 14m` computed per join attempt.
 
 Tradeoff accepted: no `/banlist` entry, vanilla `/pardon` won't clear it. Mod ships its own commands (§5).
 
 ### 3.4 Real-time clock only (**C**)
-Lockout duration is `lockout.minutes`, measured in **wall-clock time**. No Minecraft-day clock, no tick counting.
+Purgatory duration is `purgatory.minutes`, measured in **wall-clock time**. No Minecraft-day clock, no tick counting.
 
-The timer counts down while the server is offline — a 6-hour lockout started at 22:00 has expired by 04:00 whether or not the server ran overnight. This is the intended and less surprising behavior.
+The timer counts down while the server is offline — a 6-hour Purgatory started at 22:00 has expired by 04:00 whether or not the server ran overnight. This is the intended and less surprising behavior.
 
-**Why the world clock was dropped:** a Minecraft-day lockout is controlled by *other players*. Everyone sleeping burns the night instantly, so a 1-MC-day ban can elapse in seconds of real time — the ban expires, the player rejoins with everything intact, and the still-pending purge then fires on them while online. Worse, it hands the group a lever: sleep-cycle to spring a friend early, or refuse to sleep to stretch someone's sentence. No config validation can bound any of it (§4.4b).
+**Why the world clock was dropped:** a Minecraft-day Purgatory is controlled by *other players*. Everyone sleeping burns the night instantly, so a 1-MC-day ban can elapse in seconds of real time — the ban expires, the player rejoins with everything intact, and the still-pending purge then fires on them while online. Worse, it hands the group a lever: sleep-cycle to spring a friend early, or refuse to sleep to stretch someone's sentence. No config validation can bound any of it (§4.4b).
 
 ### 3.5 Countdown message
 Computed fresh at each join attempt, so always accurate.
@@ -118,7 +118,7 @@ only when non-zero, so the column positions never shift as the value counts down
 |---|---|
 | `%time_remaining%` | humanized — `2h 14m`, `45m` |
 | `%time_remaining_short%` | `00:02:14:33` — `DD:HH:MM:SS` |
-| `%unlock_time%` | absolute wall-clock time the lockout ends, in the **server's** timezone — still supported, no longer used by the default message |
+| `%unlock_time%` | absolute wall-clock time the Purgatory ends, in the **server's** timezone — still supported, no longer used by the default message |
 | `%player%` | player name |
 | `%death_reason%` | vanilla death message |
 | `%grace_remaining%` | time left in which a pardon still restores everything — `4m 12s`, or `expired` |
@@ -148,7 +148,7 @@ Per-UUID files in the world folder:
 ### 4.2 ⚠️ NEVER purge these
 | Path | Why it must survive |
 |---|---|
-| `whitelist.json` | **On a whitelisted server, removing them locks them out permanently** — the lockout becomes a life sentence. Hard exclusion. |
+| `whitelist.json` | **On a whitelisted server, removing them locks them out permanently** — the Purgatory becomes a life sentence. Hard exclusion. |
 | `ops.json` | Silently deops staff who die. Hard exclusion. |
 | `banned-players.json` | Vanilla bans are unrelated to this mod. |
 | `usercache.json` | Name↔UUID cache; removing it breaks name resolution in commands for no benefit. |
@@ -159,11 +159,11 @@ Per-UUID files in the world folder:
 - **Advancement toasts re-fire** on rejoin. Cosmetic.
 - **Stat-tracking scoreboard objectives zero out** for that player.
 
-### 4.4 Constraint: lockout must outlast the grace period (**I**)
+### 4.4 Constraint: Purgatory must outlast the grace period (**I**)
 
-**Rule:** `lockout.minutes > wipe.graceMinutes`.
+**Rule:** `purgatory.minutes > wipe.graceMinutes`.
 
-Both values are in minutes, so the rule is a plain comparison an admin can check by eye. The default 5 minute grace yields a **6-minute minimum lockout**. The hard delete can therefore never still be pending when the ban lifts.
+Both values are in minutes, so the rule is a plain comparison an admin can check by eye. The default 5 minute grace yields a **6-minute minimum Purgatory**. The hard delete can therefore never still be pending when the ban lifts.
 
 > **Key history.** `wipe.delaySeconds` → `wipe.graceSeconds` (rename, aliased) → `wipe.graceMinutes` (**unit change, deliberately NOT aliased**).
 >
@@ -171,11 +171,11 @@ Both values are in minutes, so the rule is a plain comparison an admin can check
 > as five *hours*. An old config loses the value and takes the default instead, which is the
 > safe direction to be wrong in.
 
-This removes the bug a bare delay would otherwise introduce — without the constraint, a short lockout produces:
+This removes the bug a bare delay would otherwise introduce — without the constraint, a short Purgatory produces:
 
 ```
 t=T        disconnect, hard delete scheduled for T+5min
-t=T+2min   lockout expires, player rejoins WITH ALL THEIR STUFF
+t=T+2min   Purgatory expires, player rejoins WITH ALL THEIR STUFF
 t=T+5min   hard delete fires on a LIVE player
            → vanilla re-saves their playerdata on next disconnect
            → purge silently undone
@@ -183,21 +183,21 @@ t=T+5min   hard delete fires on a LIVE player
 
 **Where it must be enforced** — all three, since every one of them is reachable at runtime:
 1. **Config load** — reject or clamp an invalid file, log loudly.
-2. **`config set`** — in *both* directions. Lowering `lockout.minutes` and raising `wipe.graceMinutes` can each break the invariant, so both setters validate against the other's current value.
-3. **`/lethe admin lock <player> [dur]`** — a manual lock with a custom duration is subject to the same floor.
+2. **`config set`** — in *both* directions. Lowering `purgatory.minutes` and raising `wipe.graceMinutes` can each break the invariant, so both setters validate against the other's current value.
+3. **`/lethemc admin lock <player> [dur]`** — a manual lock with a custom duration is subject to the same floor.
 
 Error text should name both values and the resulting minimum, e.g.
-`lockout.minutes must be greater than wipe.graceMinutes (5). Try 6 or higher.`
+`purgatory.minutes must be greater than wipe.graceMinutes (5). Try 6 or higher.`
 
 ### 4.4b ✅ The constraint is now airtight
 Two paths previously escaped it. Both are closed:
-- **Pardon** — closed by **J** (§4.6). Cancelling the purge alongside the lockout leaves nothing scheduled when a player is released early.
-- **`MC_DAYS`** — closed by **C**. It was fundamentally unvalidatable: with everyone sleeping, a 1-MC-day lockout elapses in seconds, so the ban reliably expires while the purge is still pending. Real-time-only removes the mode entirely.
+- **Pardon** — closed by **J** (§4.6). Cancelling the purge alongside the Purgatory leaves nothing scheduled when a player is released early.
+- **`MC_DAYS`** — closed by **C**. It was fundamentally unvalidatable: with everyone sleeping, a 1-MC-day Purgatory elapses in seconds, so the ban reliably expires while the purge is still pending. Real-time-only removes the mode entirely.
 
-With both gone, **no lockout can expire while a purge is pending** — *provided the purge actually runs on schedule.*
+With both gone, **no Purgatory can expire while a purge is pending** — *provided the purge actually runs on schedule.*
 
 > ⚠️ **Testing broke this assumption.** On a server with `pause-when-empty-seconds > 0` the
-> purge never fires at all, so the lockout expires with the wipe still pending regardless of
+> purge never fires at all, so the Purgatory expires with the wipe still pending regardless of
 > any config arithmetic (§4.11, measured 2026-08-28). The invariant holds over *timing*, not
 > over *the sweep being alive*. Closed by **K**, which refuses to run in that configuration.
 >
@@ -213,37 +213,37 @@ A restart at T+2min means the scheduled hard delete never runs. The window is 5 
 Startup recovery has three jobs, in this order:
 1. **Re-take the file locks.** They died with the last JVM. Nothing else in the design re-establishes them.
 2. **Entomb anyone caught mid-flight.** A `DYING` entry, or a `LOCKED` one that never got its files moved. Shutdown flushes everything on the way out, so the files are settled and the move is safe immediately.
-3. **Run any hard delete that fell due while the server was off.** Grace is real-time like the lockout (**C**); a restart must not silently extend anyone's mercy window.
+3. **Run any hard delete that fell due while the server was off.** Grace is real-time like the Purgatory (**C**); a restart must not silently extend anyone's mercy window.
 
-### 4.6 ✅ LOCKED: pardon cancels the lockout *and* the pending purge (**J**)
+### 4.6 ✅ LOCKED: pardon cancels the Purgatory *and* the pending purge (**J**)
 
-`/lethe admin pardon <player>` clears the ledger entry **and** cancels any scheduled purge. Consequence, by design:
+`/lethemc admin pardon <player>` clears the ledger entry **and** cancels any scheduled purge. Consequence, by design:
 
 | When the pardon lands | Result |
 |---|---|
-| Inside `wipe.graceMinutes` (default 5) | **Full restoration** — files lifted back out of the graveyard into `playerdata/`, `advancements/`, `stats/`; lockout lifted |
+| Inside `wipe.graceMinutes` (default 5) | **Full restoration** — files lifted back out of the graveyard into `playerdata/`, `advancements/`, `stats/`; Purgatory lifted |
 | Before entombment ran at all | Same outcome — the files never left, so cancelling *is* the restoration |
-| After the grace period | Lockout lifted only — the data is already gone and is **not recoverable** |
+| After the grace period | Purgatory lifted only — the data is already gone and is **not recoverable** |
 
 This is a deliberate **mercy window** for bogus deaths — lag spike, dodgy hitbox, admin error. It is the mod's only undo, and it is time-limited by design.
 
-Restoring is safe without any online-player check: a pardonable player is necessarily offline, because their lockout is still running. Nothing has written them a fresh profile to clobber.
+Restoring is safe without any online-player check: a pardonable player is necessarily offline, because their Purgatory is still running. Nothing has written them a fresh profile to clobber.
 
 **Admins cannot pardon themselves.** Otherwise the penalty is optional for anyone holding the
 permission — die, pardon, keep everything, repeat. Another admin or the server console can still
 pardon them, so a genuinely bogus death stays recoverable; it just stops being a decision someone
 makes alone about themselves. Note this guard is *mostly dormant today*: `bypass.permissionLevel`
-gates `/lethe admin` and the death exemption with the same value, so anyone who can pardon never
+gates `/lethemc admin` and the death exemption with the same value, so anyone who can pardon never
 gets a ledger entry in the first place. It is reachable when a locked-out player is opped
 afterwards, and becomes load-bearing the moment those two permissions are split (§10).
 
-A **failed** restore does not clear the ledger entry. The plot stays intact, the lockout stays put, and the admin can retry — dropping the entry would strand the files with nothing left pointing at them.
+A **failed** restore does not clear the ledger entry. The plot stays intact, the Purgatory stays put, and the admin can retry — dropping the entry would strand the files with nothing left pointing at them.
 
 **Command feedback must state which outcome occurred**, since the admin otherwise cannot tell:
 - `Pardoned <player> — purge cancelled, data restored.`
-- `Pardoned <player> — lockout lifted, but data was already purged.`
+- `Pardoned <player> — Purgatory lifted, but data was already purged.`
 
-`/lethe admin status <player>` should surface time-remaining-in-window so an admin can see whether restoration is still possible before deciding.
+`/lethemc admin status <player>` should surface time-remaining-in-window so an admin can see whether restoration is still possible before deciding.
 
 ### 4.7 `wipePending` is load-bearing
 It was a safety net when the purge fired immediately. It is now a core mechanism, enforcing four things:
@@ -329,7 +329,7 @@ Redirecting the *call* rather than injecting at the method head is deliberate:
 aborted pass would never be cleared. The flag is global — `GameRules#get` has no player
 context — so it must not outlive the single call it wraps, or an unrelated player dying in the
 same window would wrongly keep their items. A `PARDONED` player who rejoins *alive* (pardoned
-after `/lethe admin lock`, never dead) has no respawn coming, so the entry is retired on join.
+after `/lethemc admin lock`, never dead) has no respawn coming, so the entry is retired on join.
 
 Verified: `XpLevel: 35`, full inventory, all four armour pieces (26.x keeps worn gear in an
 `equipment` compound, not `ArmorItems`), ender chest intact, ledger emptied.
@@ -340,7 +340,7 @@ Verified: `XpLevel: 35`, full inventory, all four armour pieces (26.x keeps worn
 delete runs on the tick loop, and the moment it comes due is precisely the moment a dying
 player has just left — very often as the last player online. Measured on 2026-08-28 with the
 vanilla default of 60: grace expired at 18:05:14 and the purge had still not run three minutes
-later. The lockout then expired with `wipePending` still true, violating §4.4b's invariant.
+later. The Purgatory then expired with `wipePending` still true, violating §4.4b's invariant.
 
 The join-gate backstop (§4.7) caught it and cleared everything before admitting the player, so
 no data leaked — which is exactly the durability role §4.7 describes.
@@ -351,12 +351,12 @@ whole pause block when ≤ 0, and `DedicatedServer` overrides the method so the 
 usually to save CPU on a host running several servers.
 
 **Chosen fix:** read the setting at startup and, if it is non-zero, **stand down entirely** —
-a loud multi-line `ERROR` banner, `/lethe info` and `/lethe admin list` reporting DISABLED, and no
-death interception, no lockout enforcement, no file movement at all. Half-working is the one
-outcome worse than off: taking a player's inventory and then failing to run the lockout is
+a loud multi-line `ERROR` banner, `/lethemc info` and `/lethemc admin list` reporting DISABLED, and no
+death interception, no Purgatory enforcement, no file movement at all. Half-working is the one
+outcome worse than off: taking a player's inventory and then failing to run the Purgatory is
 strictly worse than never having touched them. Standing down also *undoes* pending state —
 restoring anyone already in the graveyard and clearing the ledger — so flipping the setting
-mid-lockout cannot strand files with nothing left to purge or return them. Documented as a
+mid-Purgatory cannot strand files with nothing left to purge or return them. Documented as a
 hard requirement in the README.
 
 
@@ -417,7 +417,7 @@ The mechanics were sound but the words were technical. The player-facing model i
 
 | Concept | Term |
 |---|---|
-| The lockout | **Purgatory** — a holding place, not a punishment, and it ends |
+| The Purgatory | **Purgatory** — a holding place, not a punishment, and it ends |
 | Pardon inside the grace period | **Resurrected** — you return as you were |
 | Purgatory expiring | **Reincarnated** — you return, but as no one |
 | Pardon after the grace period | **released early** — mercy, not resurrection |
@@ -430,7 +430,7 @@ have to decode a metaphor to find out what they are losing.
 and it connotes restoration, which is what Resurrection does. Reincarnation is the exact
 opposite and the correct word: new life, nothing carried over.
 
-`/lethe admin resurrect` is an **alias** for `pardon`, not a replacement. One behaviour, quietly
+`/lethemc admin resurrect` is an **alias** for `pardon`, not a replacement. One behaviour, quietly
 downgrading when the remains are gone, reachable by whichever word the admin thinks in.
 
 #### Reincarnation greeting
@@ -460,28 +460,28 @@ renders that Component verbatim. `ServerPlayerMixin` modifies that argument, giv
 
 ## 5. Commands (**E**)
 
-Root `/lethemc`, alias `/lethe`.
+Root `/lethemc`, alias `/lethemc`.
 
 ### Player (open to everyone)
 ```
-/lethe                      # alias for info
-/lethe info                    # what happens when you die: clock, duration,
+/lethemc                      # alias for info
+/lethemc info                    # what happens when you die: clock, duration,
                             #   what gets wiped — human-readable
-/lethe status                  # your own lockout state
+/lethemc status                  # your own Purgatory state
 ```
 
 ### Admin (`bypass.permissionLevel`, default op 4)
 ```
-/lethe admin config list             # all keys + current values
-/lethe admin config get <key>
-/lethe admin config set <key> <val>  # writes through immediately, no restart
-/lethe admin reload                  # hot-reload config from disk
-/lethe admin status <player>         # includes whether a purge is still pending
-/lethe admin list                    # everyone currently locked out
-/lethe admin pardon <player>         # lifts lockout AND cancels pending purge;
+/lethemc admin config list             # all keys + current values
+/lethemc admin config get <key>
+/lethemc admin config set <key> <val>  # writes through immediately, no restart
+/lethemc admin reload                  # hot-reload config from disk
+/lethemc admin status <player>         # includes whether a purge is still pending
+/lethemc admin list                    # everyone currently in Purgatory
+/lethemc admin pardon <player>         # lifts Purgatory AND cancels pending purge;
                                   #   inside the window = full restore (§4.6)
-/lethe admin lock <player> [dur]     # apply the penalty manually
-/lethe admin purge <player>          # force the pending purge immediately
+/lethemc admin lock <player> [dur]     # apply the penalty manually
+/lethemc admin purge <player>          # force the pending purge immediately
 ```
 
 `config set` and `reload` are both needed: `set` for live tweaks, `reload` for admins who hand-edited the JSON.
@@ -493,10 +493,10 @@ Root `/lethemc`, alias `/lethe`.
 | `wipe.playerData` | bool | `true` | Purge `players/data/<uuid>.dat` (+ `.dat_old`) |
 | `wipe.advancements` | bool | `true` | Purge `players/advancements/<uuid>.json` |
 | `wipe.stats` | bool | `true` | Purge `players/stats/<uuid>.json` |
-| `wipe.graceMinutes` | int | `5` | How long an entombed player stays restorable before the hard delete (**H**). Must stay below the lockout duration — §4.4. |
+| `wipe.graceMinutes` | int | `5` | How long an entombed player stays restorable before the hard delete (**H**). Must stay below the Purgatory duration — §4.4. |
 | `wipe.lockFiles` | bool | `true` | Hold an exclusive OS lock on graveyard files for the whole grace period — §4.9 |
-| `lockout.minutes` | int | `360` | Lockout duration in real-time minutes (6h). **Min = `wipe.graceMinutes` + 1, i.e. 6 at defaults** — §4.4 |
-| `lockout.deathScreenSeconds` | int | `15` | Death-screen hold; timer starts at expiry or manual disconnect |
+| `purgatory.minutes` | int | `360` | Purgatory duration in real-time minutes (6h). **Min = `wipe.graceMinutes` + 1, i.e. 6 at defaults** — §4.4 |
+| `purgatory.deathScreenSeconds` | int | `15` | Death-screen hold; timer starts at expiry or manual disconnect |
 | `message.death` | string | — | Disconnect message on death |
 | `message.rejoin` | string | — | Blocked-join message |
 | `bypass.permissionLevel` | int | `4` | Op level exempt from the penalty |
@@ -509,7 +509,7 @@ Config + ledger persisted as JSON in the world folder.
 
 ### 6.1 Hook points
 - **Keep-inventory override:** intercept the death/drop decision and force the keep branch without reading or writing the real gamerule.
-- **Death screen hold:** ignore the client's respawn request for `deathScreenSeconds`; detect manual disconnect during that window to stamp `lockoutStartsAt` early.
+- **Death screen hold:** ignore the client's respawn request for `deathScreenSeconds`; detect manual disconnect during that window to stamp `purgatoryStartsAt` early.
 - **Join intercept:** the vanilla player-manager join check already returns a disconnect reason (or none) and is where vanilla's own ban check lives — the natural seam. Compute the countdown there, and enforce §4.4 there.
 - **Entomb:** `@Inject(method="remove", at=@At("TAIL"))` on `PlayerList` — the first instant the files are safely takeable. See §6.2.
 - **Hard delete:** tick-loop check against `purgeAt`, `wipe.graceMinutes` after entombment.
@@ -538,12 +538,12 @@ taken, so there is nothing left to fall back to either way.
 ### 6.4 Persistence
 Ledger record per UUID:
 ```
-{ deathAt, lockoutStartsAt, state, durationMillis, graceMillis,
+{ deathAt, purgatoryStartsAt, state, durationMillis, graceMillis,
   wipePending, graveyardAt, entombRetryAt, purgeAt, deathReason, name }
 ```
 - `state`: `DYING` (death screen, timer not started) → `LOCKED` → cleared on expiry.
 - `purgeAt` — absolute timestamp, so a restart can reschedule or immediately run an overdue purge.
-- **Snapshot the duration at time of death** so `config set lockout.minutes` doesn't retroactively re-time everyone already locked out.
+- **Snapshot the duration at time of death** so `config set purgatory.minutes` doesn't retroactively re-time everyone already locked out.
 - All timestamps are wall-clock epoch millis (**C**).
 - Store in the world folder — never memory-only, or a restart is a free pardon.
 
@@ -584,7 +584,7 @@ Project: `IdeaProjects/MC_Code/LetheMC/26.2` — single-loader Fabric, `environm
 
 ### Verified
 - Compiles clean; jar builds.
-- Dev server boots, mod initialises (`LetheMC ready -- lockout 360 min, grace 5 min`).
+- Dev server boots, mod initialises (`LetheMC ready -- Purgatory 360 min, grace 5 min`).
 - **All four mixins confirmed applied** with correct descriptors:
   `GameRulesMixin` → `world.level.gamerules.GameRules`, `PlayerListMixin` → `server.players.PlayerList`,
   `ServerGamePacketListenerMixin` → `server.network.ServerGamePacketListenerImpl`,
@@ -604,7 +604,7 @@ later deleted) and **Linux/Fedora 43 2026-08-29** (`minecraft@10.10.40.11`, hard
 - 4 files entombed including `.dat_old` (3 on a player's first death — nothing to rotate yet)
 - file locks **mandatory on Windows, advisory on Linux** (§4.9), hard delete unblockable on both
 - both countdowns on the rejoin screen; the message flips correctly when the remains are gone
-- hard delete on schedule on an empty server; lockout expiry; entry self-cleaning
+- hard delete on schedule on an empty server; Purgatory expiry; entry self-cleaning
 - join-gate backstop recovering a missed purge
 - **the ender chest wipe** — items surviving three deaths, cleared only by the purge
 - resurrection returning inventory, worn armour, ender chest and XP, and **surviving a
@@ -625,7 +625,7 @@ later deleted) and **Linux/Fedora 43 2026-08-29** (`minecraft@10.10.40.11`, hard
   mid-flight.
 - Entombment retry after a genuinely blocked move, and a failing restore.
 - Stand-down **with pending entries** (restoring people out of the graveyard on boot).
-- `/lethe admin purge`, `/lethe admin lock`, `/lethe status`, and bad-config clamping.
+- `/lethemc admin purge`, `/lethemc admin lock`, `/lethemc status`, and bad-config clamping.
 - The self-pardon guard has never fired — it is unreachable until `bypass.permissionLevel` is
   split, since anyone who can pardon is currently also exempt from dying.
 
@@ -656,12 +656,12 @@ Worth recording — several of these are new since the 26.1 single-loader mods:
 5. Implement join intercept + countdown, then the command tree.
 
 ### Test matrix
-- **Happy path:** die → sit the 15s → disconnect → wait out lockout → rejoin → confirm empty inventory, empty ender chest, zero XP, **zero advancements, zero stats, empty recipe book**.
-- **§4.4 constraint:** `config set lockout.minutes 3` with a 5 minute grace → confirm rejection naming both values. Then `config set wipe.graceMinutes 10` against a 6-minute lockout → confirm rejection in that direction too.
-- **§3.4 offline countdown:** die → stop the server → wait past the lockout → start → confirm the player can rejoin immediately.
+- **Happy path:** die → sit the 15s → disconnect → wait out Purgatory → rejoin → confirm empty inventory, empty ender chest, zero XP, **zero advancements, zero stats, empty recipe book**.
+- **§4.4 constraint:** `config set purgatory.minutes 3` with a 5 minute grace → confirm rejection naming both values. Then `config set wipe.graceMinutes 10` against a 6-minute Purgatory → confirm rejection in that direction too.
+- **§3.4 offline countdown:** die → stop the server → wait past the Purgatory → start → confirm the player can rejoin immediately.
 - **§4.5 restart:** die → restart the server inside the 5-minute window → confirm the purge still happens.
-- **§4.2 whitelist:** die on a whitelisted server → confirm rejoin works after the lockout.
-- **§4.6 pardon:** pardon inside the window → confirm FULL restoration (gear, XP, advancements, stats) and the correct feedback string. Pardon after the window → confirm lockout lifts, data stays gone, feedback says so.
+- **§4.2 whitelist:** die on a whitelisted server → confirm rejoin works after the Purgatory.
+- **§4.6 pardon:** pardon inside the window → confirm FULL restoration (gear, XP, advancements, stats) and the correct feedback string. Pardon after the window → confirm Purgatory lifts, data stays gone, feedback says so.
 
 ---
 
@@ -675,7 +675,7 @@ All four found by driving a real client against a throwaway server; none were re
 | 1 | **High** | Pardon restored the files, then the respawn destroyed inventory + XP. Ender chest survived only by vanilla accident. | keep-inventory override keyed on `DYING_NOW`, empty by respawn time | `PARDONED` state + `@Redirect` around `PlayerList.respawn` (§4.10) |
 | 2 | **High** | Hard delete never ran on a paused (empty) server | sweep lives on the tick loop; `pause-when-empty-seconds` stops ticking exactly when the purge falls due | stand down and refuse to run (§4.11) |
 | 3 | Medium | Player told "permanently erased" while the files were still on disk | message flipped when `purgeAt` *passed*, not when the delete *succeeded* | `DataState` enum |
-| 4 | Low | `/lethe admin status` reported "in graveyard" after the purge | `entombed()` is `graveyardAt > 0`, never cleared, and was tested before `wipePending` | `DataState` enum |
+| 4 | Low | `/lethemc admin status` reported "in graveyard" after the purge | `entombed()` is `graveyardAt > 0`, never cleared, and was tested before `wipePending` | `DataState` enum |
 | 5 | Low | The respawn redirect hooked **both** `PlayerList.respawn` call sites, so a `PARDONED` player returning from the End consumed their pardon | no `ordinal` on the `@Redirect` | `ordinal = 1` (the death respawn) |
 | 6 | **High** | Auto-respawn saved a **stale entity over live playerdata**, destroying inventory, armour and XP. Introduced in `0.1.0.7`, fixed in `0.1.0.8`. | called `PlayerList.respawn` directly and skipped the three things vanilla does after it, leaving `connection.player` on the removed entity | replay a `PERFORM_RESPAWN` packet instead (§4.13) |
 | 7 | Medium | The kick screen said "Everything you owned has been erased" **before the player was even entombed**, and stayed wrong for the whole grace period | hardcoded assertion in the default `message.death` | `%grace_line%`, which reads `dataState()` |
@@ -700,7 +700,7 @@ feature not work, and **neither is detectable without a client**. Mixin verifica
 code is reachable, not that it is right.
 
 ### Not a bug, but worth fixing
-`bypass.permissionLevel` gates the death exemption **and** `/lethe admin` with the same value, so
+`bypass.permissionLevel` gates the death exemption **and** `/lethemc admin` with the same value, so
 anyone who can pardon is also immune to dying. This makes the mod awkward to test (the tester
 must stay non-op and drive admin commands over RCON) and forces server owners to choose between
 having moderators and having moderators who can die. There is also no value meaning "nobody is
