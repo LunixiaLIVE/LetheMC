@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "net.lunix.lethemc.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "mixins": [
     "GameRulesMixin",
     "PlayerListMixin",
@@ -20,7 +20,8 @@
     "GossipContainerMixin",
     "VillagerMixin",
     "BlockEntityAttachMixin",
-    "PrimaryLevelDataAccessor"
+    "PrimaryLevelDataAccessor",
+    "ServerPlayerDeathMixin"
   ],
   "injectors": {
     "defaultRequire": 1

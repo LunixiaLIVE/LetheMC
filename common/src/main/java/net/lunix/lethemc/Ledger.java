@@ -3,7 +3,6 @@ package net.lunix.lethemc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -28,8 +27,10 @@ import java.util.UUID;
 public final class Ledger {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path PATH = FabricLoader.getInstance().getConfigDir()
-            .resolve("lethemc").resolve("ledger.json");
+    /** Resolved on demand: the config directory is injected at startup, not at class load. */
+    private static Path path() {
+        return LetheMC.configDir().resolve("lethemc").resolve("ledger.json");
+    }
     private static final Type MAP_TYPE = new TypeToken<Map<String, Entry>>() {}.getType();
 
     /** Death screen is up; the Purgatory clock has NOT started yet. */
@@ -187,8 +188,8 @@ public final class Ledger {
     // ------------------------------------------------------------------
 
     public static void load() {
-        if (!Files.exists(PATH)) return;
-        try (Reader r = Files.newBufferedReader(PATH)) {
+        if (!Files.exists(path())) return;
+        try (Reader r = Files.newBufferedReader(path())) {
             Map<String, Entry> loaded = GSON.fromJson(r, MAP_TYPE);
             if (loaded != null) entries = loaded;
         } catch (Exception e) {
@@ -198,8 +199,8 @@ public final class Ledger {
 
     public static void save() {
         try {
-            Files.createDirectories(PATH.getParent());
-            try (Writer w = Files.newBufferedWriter(PATH)) {
+            Files.createDirectories(path().getParent());
+            try (Writer w = Files.newBufferedWriter(path())) {
                 GSON.toJson(entries, MAP_TYPE, w);
             }
         } catch (IOException e) {

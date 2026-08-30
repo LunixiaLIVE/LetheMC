@@ -2,7 +2,6 @@ package net.lunix.lethemc;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -23,8 +22,10 @@ import java.util.Map;
 public final class Config {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path PATH = FabricLoader.getInstance().getConfigDir()
-            .resolve("lethemc").resolve("config.json");
+    /** Resolved on demand: the config directory is injected at startup, not at class load. */
+    private static Path path() {
+        return LetheMC.configDir().resolve("lethemc").resolve("config.json");
+    }
 
     // --- wipe ---
     public boolean wipePlayerData = true;
@@ -330,8 +331,8 @@ public final class Config {
 
     public static void load() {
         Config loaded = new Config();
-        if (Files.exists(PATH)) {
-            try (Reader r = Files.newBufferedReader(PATH)) {
+        if (Files.exists(path())) {
+            try (Reader r = Files.newBufferedReader(path())) {
                 Config fromDisk = GSON.fromJson(r, Config.class);
                 if (fromDisk != null) loaded = fromDisk;
             } catch (Exception e) {
@@ -356,8 +357,8 @@ public final class Config {
 
     public static void save() {
         try {
-            Files.createDirectories(PATH.getParent());
-            try (Writer w = Files.newBufferedWriter(PATH)) {
+            Files.createDirectories(path().getParent());
+            try (Writer w = Files.newBufferedWriter(path())) {
                 GSON.toJson(INSTANCE, w);
             }
         } catch (IOException e) {

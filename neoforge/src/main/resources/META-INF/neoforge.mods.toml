@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+    modId = "lethemc"
+    version = "${version}"
+    displayName = "LetheMC"
+    description = "Death takes everything you own -- inventory, ender chest, XP, advancements, statistics, tamed animals -- and sends you to Purgatory: locked out of the server for a stretch of real time. An admin can resurrect you inside a grace period; otherwise you are reincarnated, and return as no one. Server-side only."
+    displayURL = "https://github.com/LunixiaLIVE/LetheMC"
+
+# Pinned to the 26.2 minor line. 26.x compatibility breaks at minor boundaries, not patch
+# ones, so the wrong jar must be refused rather than left to crash at runtime.
+[[dependencies.lethemc]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "[26.2,26.3)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.lethemc]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "[26.2,26.3)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[mixins]]
+    config = "lethemc.mixins.json"

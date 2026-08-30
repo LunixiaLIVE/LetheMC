@@ -1,12 +1,8 @@
 package net.lunix.lethemc;
 
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.lunix.lethemc.command.LetheCommand;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.server.MinecraftServer;
@@ -15,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permission;
 import net.minecraft.server.permissions.PermissionSet;
 import net.minecraft.server.permissions.Permissions;
+import java.nio.file.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public class LetheMC implements ModInitializer {
+public final class LetheMC {
 
     public static final String MOD_ID = "lethemc";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
@@ -103,82 +100,103 @@ public class LetheMC implements ModInitializer {
     private static boolean standingDown = false;
     private static String standDownReason = "";
 
-    @Override
-    public void onInitialize() {
+    /**
+     * Where the config lives, handed in by whichever loader started us.
+     *
+     * <p>Injected rather than looked up: {@code FabricLoader} and {@code FMLPaths} are the same
+     * answer behind two loader-specific doors, and asking through either one would drag a loader
+     * dependency into code that has no other reason to know which loader it is running on.
+     */
+    private static Path configDir;
+
+    /** Called once by each loader's entrypoint, before anything else. */
+    public static void setup(Path dir) {
+        configDir = dir;
         Config.load();
+    }
 
-        ServerLifecycleEvents.SERVER_STARTED.register(s -> {
-            server = s;
-            Ledger.load();
+    /** The config directory, for everything that keeps a file. */
+    public static Path configDir() {
+        return configDir;
+    }
 
-            List<String> problems = checkPreconditions(s);
-            if (!problems.isEmpty()) {
-                standDown(s, problems);
-                return;
-            }
+    // ------------------------------------------------------------------
+    // Loader-agnostic handlers.
+    //
+    // Each loader wires its own native events to these. Nothing below knows or cares which
+    // one is running -- the only asymmetry left was the pair of Fabric death events, and
+    // those are now a mixin on ServerPlayer.die() that behaves the same on both.
+    // ------------------------------------------------------------------
 
-            Taunts.load();
-            Incarnations.load();
-            recover(s);
-            LOGGER.info("LetheMC ready -- Purgatory {} min, grace {} min",
-                    Config.get().purgatoryMinutes, Config.get().wipeGraceMinutes);
-            noteHardcore(s);
-        });
+    public static void onServerStarted(MinecraftServer s) {
+        server = s;
+        Ledger.load();
 
-        ServerLifecycleEvents.SERVER_STOPPING.register(s -> {
-            Ledger.save();
-            // Hand the OS its file locks back explicitly. Process exit would do it anyway,
-            // but not if the JVM is still winding down while a backup job starts.
-            Graveyard.releaseAll();
-        });
+        List<String> problems = checkPreconditions(s);
+        if (!problems.isEmpty()) {
+            standDown(s, problems);
+            return;
+        }
 
-        // Fires at the head of death processing.
-        ServerLivingEntityEvents.ALLOW_DEATH.register((entity, source, amount) -> {
-            if (standingDown) return true;
-            if (entity instanceof ServerPlayer player && !isExempt(player)) {
-                DYING_NOW.add(player.getUUID());
-            }
-            return true;
-        });
+        Taunts.load();
+        Incarnations.load();
+        recover(s);
+        LOGGER.info("LetheMC ready -- Purgatory {} min, grace {} min",
+                Config.get().purgatoryMinutes, Config.get().wipeGraceMinutes);
+        noteHardcore(s);
+    }
 
-        // Fires at the tail, after drops would have happened.
-        ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
-            if (standingDown) return;
-            if (!(entity instanceof ServerPlayer player)) return;
-            DYING_NOW.remove(player.getUUID());
-            if (isExempt(player)) return;
-            onPlayerDeath(player);
-        });
+    public static void onServerStopping() {
+        Ledger.save();
+        // Hand the OS its file locks back explicitly. Process exit would do it anyway, but not
+        // if the JVM is still winding down while a backup job starts.
+        Graveyard.releaseAll();
+    }
 
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, s) -> {
-            // Before the stand-down check: an admin joining a disabled server still wants to
-            // know its world and its properties disagree.
-            warnAdminOfHardcoreMismatch(handler.getPlayer());
-            if (standingDown) return;
-            greetReincarnated(handler.getPlayer());
-            retirePardonIfAlive(handler.getPlayer());
-        });
+    /** At the head of death processing, before drops. Called from ServerPlayerDeathMixin. */
+    public static void onDeathBegin(ServerPlayer player) {
+        if (standingDown) return;
+        if (!isExempt(player)) {
+            DYING_NOW.add(player.getUUID());
+        }
+    }
 
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, s) -> {
-            if (standingDown) return;
-            // Bound the pardoned-respawn flag: it is normally cleared at the tail of the
-            // respawn packet handler, but a player dropping mid-respawn would strand it, and
-            // it forces keepInventory globally while set.
-            ServerPlayer p = handler.getPlayer();
-            if (p != null) {
-                PARDONED_RESPAWN.remove(p.getUUID());
-                AUTO_RESPAWN_IN_TICKS.remove(p.getUUID());
-            }
-            onDisconnect(p);
-        });
+    /** At the tail, after drops would have happened. Called from ServerPlayerDeathMixin. */
+    public static void onDeathEnd(ServerPlayer player) {
+        if (standingDown) return;
+        DYING_NOW.remove(player.getUUID());
+        if (isExempt(player)) return;
+        onPlayerDeath(player);
+    }
 
-        ServerTickEvents.END_SERVER_TICK.register(s -> {
-            if (standingDown) return;
-            tick(s);
-        });
+    public static void onPlayerJoin(ServerPlayer player) {
+        // Before the stand-down check: an admin joining a disabled server still wants to know
+        // its world and its properties disagree.
+        warnAdminOfHardcoreMismatch(player);
+        if (standingDown) return;
+        greetReincarnated(player);
+        retirePardonIfAlive(player);
+    }
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registry, env) ->
-                LetheCommand.register(dispatcher));
+    public static void onPlayerDisconnect(ServerPlayer player) {
+        if (standingDown) return;
+        // Bound the pardoned-respawn flag: it is normally cleared at the tail of the respawn
+        // packet handler, but a player dropping mid-respawn would strand it, and it forces
+        // keepInventory globally while set.
+        if (player != null) {
+            PARDONED_RESPAWN.remove(player.getUUID());
+            AUTO_RESPAWN_IN_TICKS.remove(player.getUUID());
+        }
+        onDisconnect(player);
+    }
+
+    public static void onServerTick(MinecraftServer s) {
+        if (standingDown) return;
+        tick(s);
+    }
+
+    public static void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
+        LetheCommand.register(dispatcher);
     }
 
     // ------------------------------------------------------------------

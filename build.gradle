@@ -1,80 +1,49 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.16.0-alpha.13'
-    id 'maven-publish'
+    id "base"
+    id "architectury-plugin" version "3.5-SNAPSHOT"
+    id "dev.architectury.loom-no-remap" version "1.17.487" apply false
+    id "io.github.goooler.shadow" version "8.1.8" apply false
 }
 
-version = project.mod_version
-group = project.maven_group
+group = maven_group
+version = mod_version
 
-base {
-    archivesName = project.archives_base_name
-}
-
-loom {
-    mods {
-        "lethemc" {
-            sourceSet sourceSets.main
-        }
+tasks.register("universalJar", Jar) {
+    group = "build"
+    description = "Produces a universal JAR containing both Fabric and NeoForge"
+    dependsOn ":fabric:shadowJar", ":neoforge:shadowJar"
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    outputs.upToDateWhen { false }  // doFirst inputs are untracked; always regenerate so the universal never goes stale
+    archiveFileName = "${archives_base_name}-${mod_version}_MC-${minecraft_version}-multi.jar"
+    destinationDirectory = layout.buildDirectory.dir("libs")
+    doFirst {
+        from zipTree(project(":fabric").tasks.named("shadowJar").get().archiveFile)
+        from zipTree(project(":neoforge").tasks.named("shadowJar").get().archiveFile)
     }
 }
 
-repositories {
-}
+tasks.named("build") { dependsOn "universalJar" }
 
-dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-}
+subprojects {
+    apply plugin: "java"
+    apply plugin: "architectury-plugin"
 
-processResources {
-    inputs.property "version", project.version
-    inputs.property "minecraft_version", project.minecraft_version
-    inputs.property "loader_version", project.loader_version
-    filteringCharset = "UTF-8"
-
-    def expandProps = [
-        "version": project.version,
-        "minecraft_version": project.minecraft_version,
-        "loader_version": project.loader_version
-    ]
-    filesMatching("fabric.mod.json") {
-        expand expandProps
-    }
-}
-
-def targetJavaVersion = 21
-tasks.withType(JavaCompile).configureEach {
-    it.options.encoding = "UTF-8"
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        it.options.release.set(targetJavaVersion)
-    }
-}
-
-java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
-    if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    }
-    withSourcesJar()
-}
-
-jar {
-    archiveFileName = "${project.archives_base_name}-${project.mod_version}_MC-${project.minecraft_version}.jar"
-    def baseName = project.archives_base_name
-    from("LICENSE") {
-        rename { "${it}_${baseName}" }
-    }
-}
-
-publishing {
-    publications {
-        create("mavenJava", MavenPublication) {
-            artifactId = project.archives_base_name
-            from components.java
-        }
-    }
+    group = rootProject.group
+    version = rootProject.version
 
     repositories {
+        maven { url = "https://maven.architectury.dev/" }
+        maven { url = "https://maven.neoforged.net/releases" }
+        maven { url = "https://maven.fabricmc.net/" }
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_25
+        targetCompatibility = JavaVersion.VERSION_25
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = "UTF-8"
+        options.release = 25
     }
 }

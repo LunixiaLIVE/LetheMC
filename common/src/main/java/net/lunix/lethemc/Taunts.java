@@ -1,6 +1,5 @@
 package net.lunix.lethemc;
 
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -23,8 +22,10 @@ import java.util.Random;
  */
 public final class Taunts {
 
-    private static final Path PATH = FabricLoader.getInstance().getConfigDir()
-            .resolve("lethemc").resolve("reincarnation.txt");
+    /** Resolved on demand: the config directory is injected at startup, not at class load. */
+    private static Path path() {
+        return LetheMC.configDir().resolve("lethemc").resolve("reincarnation.txt");
+    }
 
     private static final Random RANDOM = new Random();
     private static List<String> phrases = new ArrayList<>();
@@ -46,12 +47,12 @@ public final class Taunts {
     private Taunts() {}
 
     public static void load() {
-        if (!Files.exists(PATH)) {
+        if (!Files.exists(path())) {
             writeDefaults();
         }
         List<String> loaded = new ArrayList<>();
         try {
-            for (String line : Files.readAllLines(PATH, StandardCharsets.UTF_8)) {
+            for (String line : Files.readAllLines(path(), StandardCharsets.UTF_8)) {
                 String trimmed = line.trim();
                 // '#' starts a comment so the header survives an edit, and so an owner can
                 // park a phrase without deleting it.
@@ -59,7 +60,7 @@ public final class Taunts {
                 loaded.add(trimmed);
             }
         } catch (IOException e) {
-            LetheMC.LOGGER.error("Could not read {}; reincarnation greetings will be plain", PATH, e);
+            LetheMC.LOGGER.error("Could not read {}; reincarnation greetings will be plain", path(), e);
         }
         phrases = loaded;
         LetheMC.LOGGER.info("Loaded {} reincarnation phrase(s)", phrases.size());
@@ -77,10 +78,10 @@ public final class Taunts {
         out.add("");
         out.addAll(DEFAULTS);
         try {
-            Files.createDirectories(PATH.getParent());
-            Files.write(PATH, out, StandardCharsets.UTF_8);
+            Files.createDirectories(path().getParent());
+            Files.write(path(), out, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            LetheMC.LOGGER.error("Could not write {}", PATH, e);
+            LetheMC.LOGGER.error("Could not write {}", path(), e);
         }
     }
 

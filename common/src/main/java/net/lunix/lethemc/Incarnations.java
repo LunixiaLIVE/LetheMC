@@ -3,7 +3,6 @@ package net.lunix.lethemc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -36,8 +35,10 @@ import java.util.UUID;
 public final class Incarnations {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path PATH = FabricLoader.getInstance().getConfigDir()
-            .resolve("lethemc").resolve("incarnations.json");
+    /** Resolved on demand: the config directory is injected at startup, not at class load. */
+    private static Path path() {
+        return LetheMC.configDir().resolve("lethemc").resolve("incarnations.json");
+    }
     private static final Type MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
 
     /** player UUID -> current incarnation ID. */
@@ -84,8 +85,8 @@ public final class Incarnations {
     // ------------------------------------------------------------------
 
     public static void load() {
-        if (!Files.exists(PATH)) return;
-        try (Reader r = Files.newBufferedReader(PATH)) {
+        if (!Files.exists(path())) return;
+        try (Reader r = Files.newBufferedReader(path())) {
             Map<String, String> loaded = GSON.fromJson(r, MAP_TYPE);
             if (loaded != null) current = loaded;
             LetheMC.LOGGER.info("Loaded {} incarnation record(s)", current.size());
@@ -96,8 +97,8 @@ public final class Incarnations {
 
     public static void save() {
         try {
-            Files.createDirectories(PATH.getParent());
-            try (Writer w = Files.newBufferedWriter(PATH)) {
+            Files.createDirectories(path().getParent());
+            try (Writer w = Files.newBufferedWriter(path())) {
                 GSON.toJson(current, MAP_TYPE, w);
             }
         } catch (IOException e) {

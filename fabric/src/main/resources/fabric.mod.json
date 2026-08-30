@@ -4,7 +4,9 @@
   "version": "${version}",
   "name": "LetheMC",
   "description": "Death wipes everything you own -- inventory, ender chest, XP, advancements, stats -- and locks you out of the server for a configurable stretch of real time. Server-side only; vanilla clients need nothing installed.",
-  "authors": ["LunixiaLIVE"],
+  "authors": [
+    "LunixiaLIVE"
+  ],
   "contact": {
     "sources": "https://github.com/LunixiaLIVE/LetheMC"
   },
@@ -12,7 +14,7 @@
   "environment": "server",
   "entrypoints": {
     "main": [
-      "net.lunix.lethemc.LetheMC"
+      "net.lunix.lethemc.fabric.LetheMCFabric"
     ]
   },
   "mixins": [
@@ -21,6 +23,6 @@
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric-api": "*",
-    "minecraft": ">=26.2"
+    "minecraft": "26.2.x"
   }
 }
