@@ -122,6 +122,7 @@ public class LetheMC implements ModInitializer {
             recover(s);
             LOGGER.info("LetheMC ready -- Purgatory {} min, grace {} min",
                     Config.get().purgatoryMinutes, Config.get().wipeGraceMinutes);
+            noteHardcore(s);
         });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(s -> {
@@ -199,6 +200,26 @@ public class LetheMC implements ModInitializer {
      * @return null if everything is in order, else a human-readable reason to stand down.
      */
     /**
+     * Mentions hardcore once at startup, without standing in anyone's way.
+     *
+     * <p>Nothing here depends on hardcore. The death interception, the wipe, Purgatory and the
+     * animal reclamation all behave the same on an ordinary survival world -- hardcore only adds
+     * locked-Hard difficulty, the hardened hearts, and vanilla's respawn-to-spectator, which this
+     * mod has to suppress for resurrections anyway. Refusing to run without it would gate the mod
+     * on flavour rather than function, and shut out every server that wants stakes without
+     * committing to one life.
+     *
+     * <p>So it is a recommendation, said once, where an admin will see it.
+     */
+    private static void noteHardcore(MinecraftServer s) {
+        if (s.isHardcore()) return;
+        LOGGER.info("LetheMC: this world is not hardcore. Everything works -- hardcore is only");
+        LOGGER.info("  recommended, for locked-Hard difficulty and the one-life framing the mod");
+        LOGGER.info("  was written around. It is set when a world is CREATED; hardcore=true in");
+        LOGGER.info("  server.properties does not convert an existing world.");
+    }
+
+    /**
      * Every requirement that is not met, rather than the first.
      *
      * <p>Returning one at a time would make an admin fix, restart, discover a second problem,
@@ -211,11 +232,6 @@ public class LetheMC implements ModInitializer {
         int pause = emptyPauseSeconds(s);
         if (pause > 0) {
             problems.add("server.properties has pause-when-empty-seconds=" + pause + " (must be 0)");
-        }
-        // Read from the server, which reflects level.dat -- not server.properties, which is
-        // only consulted when a world is first created and lies about existing ones.
-        if (!s.isHardcore()) {
-            problems.add("this world is not hardcore");
         }
         return problems;
     }
@@ -248,14 +264,6 @@ public class LetheMC implements ModInitializer {
                     "empty stops ticking exactly when a dying player has just left -- so the",
                     "wipe would silently never happen.",
                     "Fix: set pause-when-empty-seconds=0 in server.properties, then restart.");
-        }
-        if (problem.startsWith("this world is not hardcore")) {
-            return List.of(
-                    "LetheMC is built for hardcore: one life, and losing it costs everything.",
-                    "Hardcore also locks difficulty to Hard, which the penalty assumes.",
-                    "Fix: hardcore is written into level.dat when a world is CREATED.",
-                    "Setting hardcore=true in server.properties does NOT convert an existing",
-                    "world -- create a new one with hardcore enabled, or edit level.dat.");
         }
         return List.of();
     }
