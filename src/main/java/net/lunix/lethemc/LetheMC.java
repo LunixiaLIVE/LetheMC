@@ -213,10 +213,24 @@ public class LetheMC implements ModInitializer {
      */
     private static void noteHardcore(MinecraftServer s) {
         if (s.isHardcore()) return;
-        LOGGER.info("LetheMC: this world is not hardcore. Everything works -- hardcore is only");
-        LOGGER.info("  recommended, for locked-Hard difficulty and the one-life framing the mod");
-        LOGGER.info("  was written around. It is set when a world is CREATED; hardcore=true in");
-        LOGGER.info("  server.properties does not convert an existing world.");
+        // Silent unless the admin actually asked for hardcore. A server that never wanted it
+        // does not need telling, and a note that fires for everyone is a note nobody reads.
+        if (!(s instanceof DedicatedServer ds) || !ds.getProperties().hardcore) return;
+
+        LOGGER.warn("+----------------------------------------------------------------+");
+        LOGGER.warn("|  server.properties says hardcore=true, but this world is not.  |");
+        LOGGER.warn("+----------------------------------------------------------------+");
+        LOGGER.warn("  Hardcore is written into level.dat when a world is CREATED. Setting");
+        LOGGER.warn("  it afterwards does nothing -- vanilla ignores the property for a world");
+        LOGGER.warn("  that already exists, and says nothing about it. Your world is still");
+        LOGGER.warn("  in survival: no hardened hearts, and difficulty is not locked to Hard.");
+        LOGGER.warn("");
+        LOGGER.warn("  To actually get hardcore, create a NEW world with hardcore=true set,");
+        LOGGER.warn("  or edit hardcore in level.dat with an NBT editor.");
+        LOGGER.warn("");
+        LOGGER.warn("  LetheMC does not need hardcore and is running normally. Deaths still");
+        LOGGER.warn("  cost everything and still send players to Purgatory.");
+        LOGGER.warn("+----------------------------------------------------------------+");
     }
 
     /**

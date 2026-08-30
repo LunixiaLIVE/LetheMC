@@ -44,8 +44,17 @@ so the conversion is suppressed for exactly that case — a resurrected player c
 survival, not stuck spectating with all their gear.
 
 > [!NOTE]
-> Hardcore is written into `level.dat` when a world is **created**. Setting `hardcore=true` in
-> `server.properties` does not convert a world that already exists.
+> **Hardcore is written into `level.dat` when a world is created.** Setting `hardcore=true` in
+> `server.properties` afterwards does *nothing* — vanilla ignores it for an existing world, and
+> tells you nothing either way. Measured, not assumed: a world created with `hardcore=false`
+> still reads `hardcore=0` after flipping the property and restarting.
+>
+> LetheMC warns about exactly this case. If your properties file asks for hardcore and the world
+> is not hardcore, you get a console block explaining why — and confirming the mod is running
+> normally regardless. If you never wanted hardcore, it stays quiet.
+>
+> To actually get it: create a **new** world with `hardcore=true`, or edit `level.dat` with an
+> NBT editor.
 
 ---
 
