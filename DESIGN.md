@@ -975,6 +975,22 @@ dead life's reputation must read as nothing wherever it lands; only the *destruc
 Any living customer spares the villager, **online or not** -- the check reads `incarnations.json`,
 never the player list.
 
+**And while its customers are in Purgatory, the villager cannot be traded with.** Sparing on a
+living customer is the whole rule, which makes it the whole exploit: during the grace period a
+friend can walk the hall, buy one item from each villager, and become the living customer that
+saves all of them. The owner is offline and cannot object. It is the chest-donkey hole worked
+from the other direction -- not stealing what the death should take, but *rescuing* it.
+
+Like the fox ward this asks the **ledger, not the stamps**: the customer's incarnation has not
+rotated yet during the very window being protected, so a staleness test there produces a ward
+that never fires. A villager any living player already deals with is never warded, because it was
+never at risk.
+
+> Verified with a paired test in one grace window, because a ward that blocked *every* villager
+> would pass the obvious version of this test while silently freezing every villager on the
+> server whenever anyone died. A doomed villager refused to open; an unrelated one traded
+> normally; the doomed one was destroyed at rotation.
+
 > `wipe.villagers` is the most destructive setting in the mod: it removes world content rather
 > than belongings, and on a shared server a hall used by one player who dies is gone for good.
 > Default `true` was a deliberate call, on the grounds that a hall is built work in the same

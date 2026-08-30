@@ -150,6 +150,10 @@ Three rules keep it from emptying your village:
   someone who is still alive keeps working for them.
 - **Villagers bred and left alone are never touched**, and neither is anyone you traded with
   before installing the mod.
+- **While you are in Purgatory, nobody can trade with the villagers you alone built.** Otherwise
+  a friend could walk your hall during the grace period, buy one item from each villager, and
+  make themselves the living customer that spares the lot. Villagers anyone else already trades
+  with are unaffected and stay open for business.
 
 ---
 
