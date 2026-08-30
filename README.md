@@ -10,6 +10,15 @@ Server-side only. Players connect with a vanilla client; nothing to install on t
 
 ---
 
+> [!IMPORTANT]
+> **Dedicated servers only.** In a single-player world LetheMC does nothing and says so once in
+> the log. Purgatory is a lockout enforced at login and lifted early only by an admin — a
+> single-player save has neither, so dying would shut you out of your own world with nobody able
+> to let you back in until the timer ran out.
+>
+> On Fabric the mod is not even loaded in single player. On NeoForge it loads and then stands
+> down, because NeoForge has no way to declare a mod server-only in its metadata.
+
 ## ⚠️ Required server setting
 
 ```properties
@@ -88,7 +97,7 @@ is irrelevant there. On a non-hardcore world it behaves normally and LetheMC doe
 | Loaders | **Fabric** 0.19.3+ · **NeoForge** |
 | Fabric API | *Fabric only; NeoForge needs nothing extra* |
 | Java | **25+** — the jar is compiled to Java 25 and will not load on anything older |
-| Side | Server only |
+| Side | **Dedicated server only** — LetheMC stands down in single player |
 
 ## Install
 

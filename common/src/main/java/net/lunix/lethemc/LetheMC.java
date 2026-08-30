@@ -310,6 +310,13 @@ public final class LetheMC {
     private static List<String> checkPreconditions(MinecraftServer s) {
         List<String> problems = new ArrayList<>();
 
+        // Checked first: everything below assumes a server an admin runs, and on an
+        // integrated one the rest of the list is meaningless anyway.
+        if (!(s instanceof DedicatedServer)) {
+            problems.add("this is a single-player world, not a dedicated server");
+            return problems;
+        }
+
         int pause = emptyPauseSeconds(s);
         if (pause > 0) {
             problems.add("server.properties has pause-when-empty-seconds=" + pause + " (must be 0)");
@@ -339,6 +346,14 @@ public final class LetheMC {
      * admin is standing when they find out.
      */
     private static List<String> explain(String problem) {
+        if (problem.startsWith("this is a single-player world")) {
+            return List.of(
+                    "Purgatory is a lockout from a server, enforced at login, and lifted early",
+                    "only by an admin with the permission to do it. A single-player world has",
+                    "neither -- dying would lock you out of your own save with nobody able to",
+                    "let you back in until the timer expired.",
+                    "LetheMC therefore does nothing here. Deaths are entirely vanilla.");
+        }
         if (problem.startsWith("server.properties has pause-when-empty")) {
             return List.of(
                     "The purge runs on the server tick loop, and a server that pauses when",
