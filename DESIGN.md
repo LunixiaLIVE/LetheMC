@@ -1,6 +1,6 @@
-# LetheMC — Design Doc
+# Lethe — Design Doc
 
-**Name:** `LetheMC` — Modrinth slug `lethemc` **verified free** 2026-08-20. CurseForge unverified (Cloudflare 403) — check manually before registering.
+**Name:** `Lethe` — Modrinth slug `lethemc` **verified free** 2026-08-20. CurseForge unverified (Cloudflare 403) — check manually before registering.
 **Status:** implemented and **in-game tested end to end on 2026-08-28** against a real client (v0.1.0.4). Four bugs found and fixed during that session — see §10.
 **Target:** Fabric, MC 26.x, **server-side only** (vanilla clients connect unmodified)
 
@@ -152,7 +152,7 @@ Per-UUID files in the world folder:
 | `ops.json` | Silently deops staff who die. Hard exclusion. |
 | `banned-players.json` | Vanilla bans are unrelated to this mod. |
 | `usercache.json` | Name↔UUID cache; removing it breaks name resolution in commands for no benefit. |
-| LetheMC ledger | The ban entry itself — explicitly excluded per spec. |
+| Lethe ledger | The ban entry itself — explicitly excluded per spec. |
 
 ### 4.3 Side effects of wiping advancements + stats — intended, but worth knowing
 - **Recipe book resets completely.** Recipe unlocks live in the advancement file, so the player returns unable to craft anything they hadn't rediscovered. Bigger in practice than losing advancement toasts.
@@ -367,7 +367,7 @@ runs an unconditional `setGameMode(SPECTATOR)`. That branch tests `isHardcore()`
 else — there is no "has died" flag anywhere. The spectator state persists only because it is
 written to `playerGameType` in playerdata afterwards.
 
-**A normal LetheMC death never reaches it.** `shouldBlockRespawn` cancels the respawn packet
+**A normal Lethe death never reaches it.** `shouldBlockRespawn` cancels the respawn packet
 at HEAD for the whole death screen, so `PlayerList.respawn` and the spectator conversion are
 both unreachable while a player is `DYING`. They are held, kicked, wiped, and return in
 survival. Vanilla's penalty is *bypassed*, not disabled — hardcore hearts and the difficulty
@@ -580,11 +580,11 @@ Surveyed Modrinth + CurseForge 2026-08-20. This combination does not exist.
 
 ## 8. Build Status (2026-08-29)
 
-Project: `IdeaProjects/MC_Code/LetheMC/26.2` — single-loader Fabric, `environment: "server"`, Java 21, loom 1.16.0-alpha.13, MC 26.2 / loader 0.19.3 / fabric-api 0.153.0+26.2. Jar: `build/libs/lethemc-0.1.1.1_MC-26.2.jar`.
+Project: `IdeaProjects/MC_Code/Lethe/26.2` — single-loader Fabric, `environment: "server"`, Java 21, loom 1.16.0-alpha.13, MC 26.2 / loader 0.19.3 / fabric-api 0.153.0+26.2. Jar: `build/libs/lethemc-0.1.1.1_MC-26.2.jar`.
 
 ### Verified
 - Compiles clean; jar builds.
-- Dev server boots, mod initialises (`LetheMC ready -- Purgatory 360 min, grace 5 min`).
+- Dev server boots, mod initialises (`Lethe ready -- Purgatory 360 min, grace 5 min`).
 - **All four mixins confirmed applied** with correct descriptors:
   `GameRulesMixin` → `world.level.gamerules.GameRules`, `PlayerListMixin` → `server.players.PlayerList`,
   `ServerGamePacketListenerMixin` → `server.network.ServerGamePacketListenerImpl`,
@@ -639,7 +639,7 @@ Worth recording — several of these are new since the 26.1 single-loader mods:
   `NameAndId` is a record with `id()` / `name()`.
 - **Integer permission levels are gone.** `CommandSourceStack.permissions()` and `ServerPlayer.permissions()` return a
   `PermissionSet`; check with `hasPermission(Permission)` against `Permissions.COMMANDS_MODERATOR/GAMEMASTER/ADMIN/OWNER`.
-  LetheMC keeps `bypass.permissionLevel` as 0-4 in config and maps it internally, so admins keep the vocabulary they know.
+  Lethe keeps `bypass.permissionLevel` as 0-4 in config and maps it internally, so admins keep the vocabulary they know.
 - `authlib` `GameProfile` no longer exposes `getName()` / `getId()`. Use `player.getName().getString()`.
 - `disconnect(Component)` lives on `ServerCommonPacketListenerImpl`.
 - Mixin `compatibilityLevel: JAVA_21` works when compiling at release 21 (the suite's JAVA_25 note applies to

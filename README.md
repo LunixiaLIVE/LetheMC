@@ -1,4 +1,4 @@
-# LetheMC
+# Lethe
 
 Death costs you everything — **including your ender chest** — and sends you to **Purgatory**:
 locked out of the server for a set amount of real time.
@@ -11,7 +11,7 @@ Server-side only. Players connect with a vanilla client; nothing to install on t
 ---
 
 > [!IMPORTANT]
-> **Dedicated servers only.** In a single-player world LetheMC does nothing and says so once in
+> **Dedicated servers only.** In a single-player world Lethe does nothing and says so once in
 > the log. Purgatory is a lockout enforced at login and lifted early only by an admin — a
 > single-player save has neither, so dying would shut you out of your own world with nobody able
 > to let you back in until the timer ran out.
@@ -25,7 +25,7 @@ Server-side only. Players connect with a vanilla client; nothing to install on t
 pause-when-empty-seconds=0
 ```
 
-**LetheMC refuses to run if this is anything else.** It logs a block naming what is wrong and how
+**Lethe refuses to run if this is anything else.** It logs a block naming what is wrong and how
 to fix it, and `/lethemc info` reports the mod as disabled. Deaths stay vanilla until you fix it —
 the mod would rather do nothing than half-work.
 
@@ -33,14 +33,14 @@ A server with this set stops ticking once the last player leaves — which is ex
 who just died has left. The purge runs on the tick loop, so the wipe would silently never happen,
 players would keep everything, and nothing would tell you.
 
-If you enable the pause while players are already in Purgatory, LetheMC hands their belongings
+If you enable the pause while players are already in Purgatory, Lethe hands their belongings
 back and clears its records on the next start, so nobody is left in limbo.
 
 ---
 
 ## 💀 Hardcore — recommended, not required
 
-LetheMC runs on any world. Nothing in it depends on hardcore: the death interception, the wipe,
+Lethe runs on any world. Nothing in it depends on hardcore: the death interception, the wipe,
 Purgatory and the animal reclamation all behave identically on an ordinary survival server.
 
 Hardcore is what the mod was *written around* — one life, and losing it costs everything — and it
@@ -48,7 +48,7 @@ locks difficulty to **Hard**. If your world is not hardcore you get a single not
 saying so, and everything works anyway.
 
 If your world **is** hardcore, one detail is handled for you: vanilla turns a dead player into a
-spectator on respawn. A normal LetheMC death never reaches that code, but a **resurrection** does,
+spectator on respawn. A normal Lethe death never reaches that code, but a **resurrection** does,
 so the conversion is suppressed for exactly that case — a resurrected player comes back in
 survival, not stuck spectating with all their gear.
 
@@ -58,7 +58,7 @@ survival, not stuck spectating with all their gear.
 > tells you nothing either way. Measured, not assumed: a world created with `hardcore=false`
 > still reads `hardcore=0` after flipping the property and restarting.
 >
-> LetheMC warns about exactly this case. If your properties file asks for hardcore and the world
+> Lethe warns about exactly this case. If your properties file asks for hardcore and the world
 > is not hardcore, you get a console block explaining why — and confirming the mod is running
 > normally regardless. If you never wanted hardcore, it stays quiet.
 >
@@ -72,20 +72,20 @@ Settings admins reasonably expect to matter, which do not.
 
 ### `keepInventory` — leave it alone
 
-LetheMC does **not** require it, and setting it either way changes nothing about how a death is
+Lethe does **not** require it, and setting it either way changes nothing about how a death is
 handled. Nothing dropping on death is not the gamerule; the mod intercepts the *read* of
 `keepInventory` for the single tick a player is dying and answers `true`, so vanilla spawns no
 items. The stored gamerule is never written, and the override does not apply to anyone else, at
 any other moment.
 
 That is deliberate. Turning the real gamerule on would change the game for every player and every
-other death on the server — including players LetheMC is configured to exempt — and an admin who
+other death on the server — including players Lethe is configured to exempt — and an admin who
 later turned it off would silently break the "nothing drops" promise.
 
 ### `difficulty` — only if you are hardcore
 
 A hardcore world locks difficulty to **Hard** on its own, so `difficulty` in `server.properties`
-is irrelevant there. On a non-hardcore world it behaves normally and LetheMC does not touch it.
+is irrelevant there. On a non-hardcore world it behaves normally and Lethe does not touch it.
 
 ---
 
@@ -97,7 +97,7 @@ is irrelevant there. On a non-hardcore world it behaves normally and LetheMC doe
 | Loaders | **Fabric** 0.19.3+ · **NeoForge** 26.2.0.7+ |
 | Fabric API | 0.153.0+26.2 — *Fabric only; NeoForge needs nothing extra* |
 | Java | **25+** — the jar is compiled to Java 25 and will not load on anything older |
-| Side | **Dedicated server only** — LetheMC stands down in single player |
+| Side | **Dedicated server only** — Lethe stands down in single player |
 
 ## Install
 
@@ -112,9 +112,9 @@ Hardcore has to be decided **before the world is generated**, so set it first.
    pause-when-empty-seconds=0
    hardcore=true            # only if you want hardcore; it is optional
    ```
-2. Put the LetheMC jar in `mods/` (plus **Fabric API**, if you are on Fabric).
+2. Put the Lethe jar in `mods/` (plus **Fabric API**, if you are on Fabric).
 3. **Start the server.** The world is created with whatever `hardcore` said, and you should see
-   `LetheMC ready` in the log.
+   `Lethe ready` in the log.
 4. Tune it to taste with `/lethemc admin config set …`, or edit `config/lethemc/config.json`.
 
 That's it — no restart dance, because the world was born the way you wanted it.
@@ -124,12 +124,12 @@ That's it — no restart dance, because the world was born the way you wanted it
 `hardcore` in `server.properties` **cannot** convert a world that already exists, so it takes a
 restart to switch it on. Do the rest first.
 
-1. **Back up your world.** LetheMC starts taking things the first time somebody dies, and the
+1. **Back up your world.** Lethe starts taking things the first time somebody dies, and the
    grace period is the only way back.
 2. **Stop the server.**
 3. Set `pause-when-empty-seconds=0` in `server.properties`.
-4. Put the LetheMC jar in `mods/` (plus **Fabric API**, if you are on Fabric).
-5. **Start the server.** You should see `LetheMC ready`. Nobody's data is touched until they die.
+4. Put the Lethe jar in `mods/` (plus **Fabric API**, if you are on Fabric).
+5. **Start the server.** You should see `Lethe ready`. Nobody's data is touched until they die.
 6. *Only if you want hardcore:* run **`/lethemc admin hardcore on`**, then **restart** the server.
    The `level.dat` change is saved immediately, but clients read the hardcore flag when they log
    in, so hearts do not change until they reconnect to a restarted server.
@@ -221,7 +221,7 @@ existing world does not cull everyone's pets.
 ### The world remembers you too
 
 Your player files are not the only place your name is kept. Three things out in the world record
-it against your UUID, and all three outlive a purge unless LetheMC deals with them.
+it against your UUID, and all three outlive a purge unless Lethe deals with them.
 
 **Trial vaults forget you.** A vault you emptied in a past life opens again. This is the only one
 that *costs* you something rather than granting it — without it a reincarnated player walks up to
@@ -342,7 +342,7 @@ file would mean any server carrying a stale `hardcore=true` converted a long-run
 world on its next boot, changing death for every player, without anyone being asked. This way it
 is one world, one deliberate act, recorded in the log with the name of whoever ran it.
 
-LetheMC does not need hardcore either way — this is here because vanilla offers no path at all.
+Lethe does not need hardcore either way — this is here because vanilla offers no path at all.
 
 ---
 
@@ -398,7 +398,7 @@ with no wrapping, so anything longer collides with it.
 
 Everything else on that screen — "Game Over!", "Score:", and the buttons — comes from the
 client's own language file. A server-side mod cannot change those, which is why the death
-message is the only line LetheMC touches.
+message is the only line Lethe touches.
 
 Times are shown as **durations**, never clock times. An absolute unlock time has to be printed
 in some timezone, and the server's is not necessarily the player's, with nothing on screen

@@ -1,4 +1,4 @@
-# Changelog — LetheMC (`multi_26.2`)
+# Changelog — Lethe (`multi_26.2`)
 
 Minecraft **26.2.x** · Fabric + NeoForge · server-side · standalone (no extra library mods).
 
@@ -42,5 +42,5 @@ Minecraft **26.2.x** · Fabric + NeoForge · server-side · standalone (no extra
 ### Requirements
 - **Java 25** — the jar is compiled to Java 25 and will not load on anything older.
 - `pause-when-empty-seconds=0` — a paused server stops ticking exactly when a dying player has
-  left, so the wipe would silently never happen. LetheMC refuses to run rather than half-work.
+  left, so the wipe would silently never happen. Lethe refuses to run rather than half-work.
 - **Dedicated servers only.** Players install nothing; a vanilla client just connects.
