@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚰️ LetheMC
+# ⚰️ Lethe
 
 ### Death takes everything — including your ender chest — and sends you to Purgatory.
 
@@ -38,7 +38,7 @@ You leave Purgatory one of two ways.
 ## 🔒 The ender chest is the point
 
 Every other death-penalty mod leaves the ender chest alone, which is why they are toothless —
-players pre-stash their good gear and shrug the penalty off. **LetheMC takes it.** There is no
+players pre-stash their good gear and shrug the penalty off. **Lethe takes it.** There is no
 safe-deposit box.
 
 ## 🐺 It follows you out into the world
@@ -70,7 +70,7 @@ choose between having admins and having stakes. By default nobody is exempt — 
 people, and you die exactly like everyone else.
 
 Runs on any world. **Hardcore is recommended, not required** — it is what the mod was written
-around, and it locks difficulty to Hard. On a hardcore world LetheMC suppresses vanilla's
+around, and it locks difficulty to Hard. On a hardcore world Lethe suppresses vanilla's
 respawn-to-spectator, so a resurrected player comes back alive rather than watching.
 
 ## 📥 Install
@@ -85,7 +85,7 @@ extra step — there are ordered instructions for both a new server and an exist
 > [!IMPORTANT]
 > **`pause-when-empty-seconds` must be `0`.** A paused server stops ticking exactly when the last
 > player leaves — usually the one who just died — so the wipe would silently never happen.
-> LetheMC refuses to run rather than half-work, and the console says exactly why.
+> Lethe refuses to run rather than half-work, and the console says exactly why.
 
 ## 📚 Full documentation
 
