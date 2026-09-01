@@ -306,13 +306,16 @@ public final class Gear {
         }
 
         // Not stale and in somebody's hands: this is the life that holds it now.
+        boolean touched = false;
         if (holder != null && (mark == null || !mark.owner().equals(holder)
                 || !mark.life().equals(Incarnations.peek(holder)))) {
             stamp(stack, holder);
+            touched = true;
         }
 
-        // The wrapper survives -- but it may be carrying somebody else's dead gear.
-        return judgeNested(stack, where, depth) ? Outcome.EDITED : Outcome.KEEP;
+        // The wrapper survives -- and whoever holds it holds what is inside it too.
+        if (judgeNested(stack, holder, where, depth)) touched = true;
+        return touched ? Outcome.EDITED : Outcome.KEEP;
     }
 
     /**
@@ -331,8 +334,22 @@ public final class Gear {
      * <p>Only what is stale inside goes; the wrapper is left alone. Destroying someone's bundle
      * over what a dead player left in it would punish the wrong person -- which is the same
      * reason a fox with one living trustee survives.
+     *
+     * <h2>Contents belong to whoever holds the bundle</h2>
+     * The holder is passed down, so picking up a bundle claims what is inside it exactly as
+     * picking up a sword claims the sword. Without that, handing someone a bundle and handing
+     * them the same items loose behaved differently: the loose ones became theirs and survived
+     * your death, the bundled ones stayed yours and vanished out of their inventory. That
+     * punishes a living player for how a gift was packaged, and quietly rewards passing things
+     * over one at a time.
+     *
+     * <p>It costs less than it appears to. Staleness is judged <em>before</em> anything is
+     * stamped, so a dead life's gear inside a bundle is destroyed rather than claimed, and
+     * during the grace period the ward refuses the re-stamp outright. The only thing this opens
+     * is the handoff <em>before</em> a death -- which is already possible with loose items, and
+     * is the accepted price of ownership following the last person to hold something.
      */
-    private static boolean judgeNested(ItemStack stack, String where, int depth) {
+    private static boolean judgeNested(ItemStack stack, UUID holder, String where, int depth) {
         if (depth >= MAX_NESTING) return false;
         String inside = where + " (in a " + stack.getHoverName().getString() + ")";
         boolean changed = false;
@@ -345,7 +362,7 @@ public final class Gear {
             List<ItemStack> kept = new ArrayList<>();
             boolean dirty = false;
             for (ItemStack inner : bundle.itemCopyStream().toList()) {
-                Outcome o = judge(inner, null, inside, depth + 1);
+                Outcome o = judge(inner, holder, inside, depth + 1);
                 if (o == Outcome.REMOVE) { dirty = true; continue; }
                 if (o == Outcome.EDITED) dirty = true;
                 kept.add(inner);
@@ -362,7 +379,7 @@ public final class Gear {
             List<ItemStack> items = new ArrayList<>(held.allItemsCopyStream().toList());
             boolean dirty = false;
             for (int i = 0; i < items.size(); i++) {
-                Outcome o = judge(items.get(i), null, inside, depth + 1);
+                Outcome o = judge(items.get(i), holder, inside, depth + 1);
                 if (o == Outcome.REMOVE) { items.set(i, ItemStack.EMPTY); dirty = true; }
                 else if (o == Outcome.EDITED) dirty = true;
             }
