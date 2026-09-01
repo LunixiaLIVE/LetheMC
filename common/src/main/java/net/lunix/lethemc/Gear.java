@@ -17,6 +17,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.component.BundleContents;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -73,6 +76,9 @@ import java.util.UUID;
 public final class Gear {
 
     private Gear() {}
+
+    /** How deep a nest of containers-inside-containers to follow before giving up. */
+    private static final int MAX_NESTING = 4;
 
     /** Our compound inside the item's {@code custom_data}. */
     private static final String TAG = "lethemc";
@@ -178,9 +184,12 @@ public final class Gear {
         if (!Config.get().wipeGear) return false;
         if (!eligible(stack)) return false;
         Mark mark = markOf(stack);
-        if (mark == null) return false;
 
-        return wards(mark);
+        if (mark != null && wards(mark)) return true;
+
+        // A bundle holding a dead player's gear cannot be pocketed either, or the ward would
+        // stop one item short of the obvious way round it.
+        return nestedWarded(stack, 0);
     }
 
     /**
@@ -255,8 +264,21 @@ public final class Gear {
      * @param holder the player whose hands it is in, or null for a container or a loose item
      * @return true if the caller should now empty the slot
      */
+    /** What a caller should do with the slot it just handed over. */
+    private enum Outcome { KEEP, EDITED, REMOVE }
+
     private static boolean judge(ItemStack stack, UUID holder, String where) {
-        if (!eligible(stack)) return false;
+        return judge(stack, holder, where, 0) == Outcome.REMOVE;
+    }
+
+    /**
+     * Applies the rule to one item, and to anything that item is carrying.
+     *
+     * @param holder the player whose hands it is in, or null for a container or a loose item
+     * @param depth  guard against a pathological nest of containers inside containers
+     */
+    private static Outcome judge(ItemStack stack, UUID holder, String where, int depth) {
+        if (!eligible(stack)) return Outcome.KEEP;
 
         Mark mark = markOf(stack);
 
@@ -268,17 +290,19 @@ public final class Gear {
             if (living != null && !living.equals(mark.life())) {
                 if (logOnly) {
                     report(stack, where, mark);
-                    return false;
+                    return Outcome.KEEP;
                 }
                 found++;
                 LetheMC.LOGGER.info("Destroying {} {} -- last held by a life that has ended",
                         stack.getHoverName().getString(), where);
-                return true;
+                // The wrapper goes whole. A stale bundle takes everything in it, exactly as a
+                // stale shulker box does -- there is no unpacking and no salvage.
+                return Outcome.REMOVE;
             }
 
             // Warded: left exactly as it is. Not re-stamped above all -- that is what stops
             // someone picking it up during the grace period and laundering it into their life.
-            if (wards(mark)) return false;
+            if (wards(mark)) return Outcome.KEEP;
         }
 
         // Not stale and in somebody's hands: this is the life that holds it now.
@@ -286,7 +310,94 @@ public final class Gear {
                 || !mark.life().equals(Incarnations.peek(holder)))) {
             stamp(stack, holder);
         }
+
+        // The wrapper survives -- but it may be carrying somebody else's dead gear.
+        return judgeNested(stack, where, depth) ? Outcome.EDITED : Outcome.KEEP;
+    }
+
+    /**
+     * Judges what a bundle or a shulker box item is carrying.
+     *
+     * <p>Without this, one item shelters another indefinitely: a bundle stamped to a living
+     * player holds a dead player's sword, the sweep sees a life still running, and never opens
+     * it. Handing your gear to a friend's bundle before dying would undo the feature in one
+     * move, and bundles nest, so the hiding place is as deep as you care to make it.
+     *
+     * <p>Bundles matter more here than shulker boxes. A box has to be <em>placed</em> to be
+     * used, and placing it makes it a block the sweep already walks -- so its contents cannot
+     * stay both hidden and usable. A bundle is emptied in the inventory and never touches the
+     * world at all.
+     *
+     * <p>Only what is stale inside goes; the wrapper is left alone. Destroying someone's bundle
+     * over what a dead player left in it would punish the wrong person -- which is the same
+     * reason a fox with one living trustee survives.
+     */
+    private static boolean judgeNested(ItemStack stack, String where, int depth) {
+        if (depth >= MAX_NESTING) return false;
+        String inside = where + " (in a " + stack.getHoverName().getString() + ")";
+        boolean changed = false;
+
+        // NOTE: both component readers hand out COPIES. A child that was edited rather than
+        // removed has to force the parent to be rebuilt too, or the edit is written to a copy
+        // and thrown away -- which silently left a dead player's axe alive two bundles deep.
+        BundleContents bundle = stack.get(DataComponents.BUNDLE_CONTENTS);
+        if (bundle != null && !bundle.isEmpty()) {
+            List<ItemStack> kept = new ArrayList<>();
+            boolean dirty = false;
+            for (ItemStack inner : bundle.itemCopyStream().toList()) {
+                Outcome o = judge(inner, null, inside, depth + 1);
+                if (o == Outcome.REMOVE) { dirty = true; continue; }
+                if (o == Outcome.EDITED) dirty = true;
+                kept.add(inner);
+            }
+            if (dirty) {
+                stack.set(DataComponents.BUNDLE_CONTENTS,
+                        new BundleContents(kept.stream().map(ItemStackTemplate::fromNonEmptyStack).toList()));
+                changed = true;
+            }
+        }
+
+        ItemContainerContents held = stack.get(DataComponents.CONTAINER);
+        if (held != null) {
+            List<ItemStack> items = new ArrayList<>(held.allItemsCopyStream().toList());
+            boolean dirty = false;
+            for (int i = 0; i < items.size(); i++) {
+                Outcome o = judge(items.get(i), null, inside, depth + 1);
+                if (o == Outcome.REMOVE) { items.set(i, ItemStack.EMPTY); dirty = true; }
+                else if (o == Outcome.EDITED) dirty = true;
+            }
+            if (dirty) {
+                stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /** Whether anything this item is carrying is warded. */
+    private static boolean nestedWarded(ItemStack stack, int depth) {
+        if (depth >= MAX_NESTING) return false;
+
+        BundleContents bundle = stack.get(DataComponents.BUNDLE_CONTENTS);
+        if (bundle != null) {
+            for (ItemStack inner : bundle.itemCopyStream().toList()) {
+                if (wardedDeep(inner, depth + 1)) return true;
+            }
+        }
+        ItemContainerContents held = stack.get(DataComponents.CONTAINER);
+        if (held != null) {
+            for (ItemStack inner : held.nonEmptyItemCopyStream().toList()) {
+                if (wardedDeep(inner, depth + 1)) return true;
+            }
+        }
         return false;
+    }
+
+    private static boolean wardedDeep(ItemStack stack, int depth) {
+        if (!eligible(stack)) return false;
+        Mark mark = markOf(stack);
+        if (mark != null && wards(mark)) return true;
+        return nestedWarded(stack, depth);
     }
 
     // ------------------------------------------------------------------
@@ -303,9 +414,12 @@ public final class Gear {
         boolean changed = false;
         for (int i = 0; i < container.getContainerSize(); i++) {
             ItemStack stack = container.getItem(i);
-            if (judge(stack, holder, where)) {
-                container.setItem(i, ItemStack.EMPTY);
-                changed = true;
+            switch (judge(stack, holder, where, 0)) {
+                case REMOVE -> { container.setItem(i, ItemStack.EMPTY); changed = true; }
+                // Written back rather than trusted to have been edited in place: most
+                // containers hand out the live stack, but nothing in the interface promises it.
+                case EDITED -> { container.setItem(i, stack); changed = true; }
+                case KEEP -> { }
             }
         }
         return changed;
