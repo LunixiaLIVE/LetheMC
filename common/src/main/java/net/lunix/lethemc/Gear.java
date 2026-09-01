@@ -268,16 +268,18 @@ public final class Gear {
     private enum Outcome { KEEP, EDITED, REMOVE }
 
     private static boolean judge(ItemStack stack, UUID holder, String where) {
-        return judge(stack, holder, where, 0) == Outcome.REMOVE;
+        return judge(stack, holder, where, 0, true) == Outcome.REMOVE;
     }
 
     /**
      * Applies the rule to one item, and to anything that item is carrying.
      *
-     * @param holder the player whose hands it is in, or null for a container or a loose item
-     * @param depth  guard against a pathological nest of containers inside containers
+     * @param holder     the player whose hands it is in, or null for a container or loose item
+     * @param depth      guard against a pathological nest of containers inside containers
+     * @param mayDestroy false for anything nested: only a top-level tag decides a purge
      */
-    private static Outcome judge(ItemStack stack, UUID holder, String where, int depth) {
+    private static Outcome judge(ItemStack stack, UUID holder, String where, int depth,
+                                 boolean mayDestroy) {
         if (!eligible(stack)) return Outcome.KEEP;
 
         Mark mark = markOf(stack);
@@ -287,7 +289,7 @@ public final class Gear {
             // once they are gone it has nothing left to say -- and letting it answer anyway
             // meant nothing was ever destroyed while the owner sat out the rest of Purgatory.
             String living = Incarnations.peek(mark.owner());
-            if (living != null && !living.equals(mark.life())) {
+            if (mayDestroy && living != null && !living.equals(mark.life())) {
                 if (logOnly) {
                     report(stack, where, mark);
                     return Outcome.KEEP;
@@ -331,9 +333,12 @@ public final class Gear {
      * stay both hidden and usable. A bundle is emptied in the inventory and never touches the
      * world at all.
      *
-     * <p>Only what is stale inside goes; the wrapper is left alone. Destroying someone's bundle
-     * over what a dead player left in it would punish the wrong person -- which is the same
-     * reason a fox with one living trustee survives.
+     * <h2>Nothing inside is ever purged on its own</h2>
+     * Only the outermost tag decides. What is inside a bundle may well have belonged to
+     * somebody else three lives ago, and that is fine -- it is carried, not owned, and it goes
+     * when the thing carrying it goes. Judging contents separately would mean a living player's
+     * bundle quietly losing items out of it, which punishes the wrong person for how a gift was
+     * packaged.
      *
      * <h2>Contents belong to whoever holds the bundle</h2>
      * The holder is passed down, so picking up a bundle claims what is inside it exactly as
@@ -362,9 +367,9 @@ public final class Gear {
             List<ItemStack> kept = new ArrayList<>();
             boolean dirty = false;
             for (ItemStack inner : bundle.itemCopyStream().toList()) {
-                Outcome o = judge(inner, holder, inside, depth + 1);
-                if (o == Outcome.REMOVE) { dirty = true; continue; }
-                if (o == Outcome.EDITED) dirty = true;
+                // REMOVE cannot come back from a nested judge -- only the outermost tag
+                // decides a purge -- so nothing is ever dropped from the list here.
+                if (judge(inner, holder, inside, depth + 1, false) == Outcome.EDITED) dirty = true;
                 kept.add(inner);
             }
             if (dirty) {
@@ -379,9 +384,7 @@ public final class Gear {
             List<ItemStack> items = new ArrayList<>(held.allItemsCopyStream().toList());
             boolean dirty = false;
             for (int i = 0; i < items.size(); i++) {
-                Outcome o = judge(items.get(i), holder, inside, depth + 1);
-                if (o == Outcome.REMOVE) { items.set(i, ItemStack.EMPTY); dirty = true; }
-                else if (o == Outcome.EDITED) dirty = true;
+                if (judge(items.get(i), holder, inside, depth + 1, false) == Outcome.EDITED) dirty = true;
             }
             if (dirty) {
                 stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
@@ -431,7 +434,7 @@ public final class Gear {
         boolean changed = false;
         for (int i = 0; i < container.getContainerSize(); i++) {
             ItemStack stack = container.getItem(i);
-            switch (judge(stack, holder, where, 0)) {
+            switch (judge(stack, holder, where, 0, true)) {
                 case REMOVE -> { container.setItem(i, ItemStack.EMPTY); changed = true; }
                 // Written back rather than trusted to have been edited in place: most
                 // containers hand out the live stack, but nothing in the interface promises it.
