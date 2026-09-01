@@ -1,0 +1,14 @@
+# Normalise line endings so a Windows checkout and a Linux build agree.
+# Without this, files written by the IDE (CRLF) and by tooling (LF) alternate,
+# and every commit shows whole-file diffs that contain no real change.
+* text=auto eol=lf
+
+# The wrapper scripts must keep the endings their interpreters expect.
+gradlew      text eol=lf
+gradlew.bat  text eol=crlf
+
+# Never touch binaries.
+*.jar   binary
+*.png   binary
+*.mca   binary
+*.dat   binary

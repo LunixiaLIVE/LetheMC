@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Fabric dev server -- generated, and contains world data
+run/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Python scratch from the testing tools
+__pycache__/
+*.pyc
+
+# publishing assets -- store descriptions and the collected jars for an upload.
+# They belong to the mod, not to any one version branch, so they live beside the
+# repo rather than inside it.
+*-upload/
+modrinth-description.md
+curseforge-description.md

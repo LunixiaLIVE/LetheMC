@@ -1,0 +1,39 @@
+plugins {
+    id "java"
+}
+
+group = maven_group
+version = mod_version
+
+repositories {
+    maven { url = "https://repo.papermc.io/repository/maven-public/" }
+    mavenCentral()
+}
+
+dependencies {
+    // Provided by the server at runtime — compileOnly keeps it out of the jar.
+    compileOnly "io.papermc.paper:paper-api:${paper_version}"
+}
+
+java {
+    // MC 26.x runs on Java 25, so the plugin targets 25 to match the platform.
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 25
+}
+
+processResources {
+    inputs.property "version", project.version
+    filteringCharset = "UTF-8"
+    filesMatching("plugin.yml") {
+        expand(["version": project.version])
+    }
+}
+
+jar {
+    archiveFileName = "${archives_base_name}-${mod_version}_MC-${minecraft_version}-paper.jar"
+}

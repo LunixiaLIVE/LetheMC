@@ -1,0 +1,12 @@
+name: Lethe
+version: '${version}'
+main: net.lunix.lethe.paper.LethePaper
+api-version: '1.21'
+description: Death takes everything you own -- including your ender chest -- and locks you out of the server for a stretch of real time.
+author: LunixiaLIVE
+website: https://github.com/LunixiaLIVE/LetheMC
+commands:
+  lethe:
+    description: Lethe commands
+    usage: /lethe [info|status|admin ...]
+    aliases: [le]

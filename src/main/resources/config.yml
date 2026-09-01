@@ -1,0 +1,56 @@
+# Lethe -- death takes everything, then locks you out for a stretch of real time.
+#
+# Every key here is also readable and settable in game:
+#   /lethe admin config list
+#   /lethe admin config set wipe.graceMinutes 5
+
+wipe:
+  # Inventory, ender chest and XP.
+  playerData: true
+  # Advancements. Recipe unlocks live here too, so a returning player cannot craft
+  # things they had already discovered -- usually more noticeable than the advancements.
+  advancements: true
+  stats: true
+
+  # How long after a death an admin can still restore EVERYTHING.
+  # Must be less than purgatory.minutes.
+  graceMinutes: 5
+
+  # Wolves, cats, parrots.
+  pets: true
+  # Horses, donkeys, mules, llamas, camels -- and whatever is in their chest.
+  livestock: true
+  # Foxes forget a dead life; one no living player trusts is destroyed with it.
+  foxes: true
+  # Trial vaults forget that a past life already looted them.
+  vaultRewards: true
+  # Trade discounts -- and grudges -- from a life that has ended.
+  villagerReputation: true
+
+  # Destroy villagers whose only customers have died.
+  #
+  # THE MOST DESTRUCTIVE SETTING HERE. It removes world content rather than a
+  # player's belongings, and it cannot be undone. Only villagers actually traded
+  # with or cured count -- hitting one does not make it yours -- and any living
+  # customer spares the villager.
+  villagers: true
+
+  # How often to look for things belonging to an ended life, in ticks.
+  sweepIntervalTicks: 20
+
+purgatory:
+  # Lockout length in REAL minutes. Keeps counting while the server is offline.
+  # Must be greater than wipe.graceMinutes.
+  minutes: 360
+
+message:
+  death: "&c☠ You have died.\n&7%death_reason%\n\n&fYou are in &5Purgatory&f for &e%time_remaining%&f.\n\n%grace_line%"
+  rejoin: "&5☠ You are in Purgatory\n\n&fYou may return in &e%time_remaining%\n\n%grace_line%"
+  reincarnation: "&5You have been reincarnated. &7Nothing of your old life remains."
+
+bypass:
+  # Who is exempt from dying.
+  #   -1  nobody (default -- you can resurrect others and still die yourself)
+  #    0  everybody
+  #    4  operators
+  permissionLevel: -1
