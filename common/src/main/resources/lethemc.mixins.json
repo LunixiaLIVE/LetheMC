@@ -23,7 +23,7 @@
     "PrimaryLevelDataAccessor",
     "ServerPlayerDeathMixin",
     "ChunkMapAccessor",
-    "ItemPickupWardMixin",
+    "ItemEntityWardMixin",
     "SlotWardMixin"
   ],
   "injectors": {

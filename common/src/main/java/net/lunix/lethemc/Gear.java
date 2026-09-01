@@ -2,6 +2,7 @@ package net.lunix.lethemc;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.lunix.lethemc.mixin.ChunkMapAccessor;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -20,6 +21,8 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -95,7 +98,21 @@ public final class Gear {
 
     /** The stamp on an item, or null if it has never been stashed by anyone. */
     public static Mark markOf(ItemStack stack) {
-        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        return markOf(stack.get(DataComponents.CUSTOM_DATA));
+    }
+
+    /**
+     * The stamp on a placed block, or null.
+     *
+     * <p>A shulker box keeps its components when it is placed and hands them back when it is
+     * broken, so the same mark that follows the item follows the block. That is what lets the
+     * two forms be treated as one thing rather than as a container that happens to be portable.
+     */
+    public static Mark markOf(BlockEntity be) {
+        return markOf(be.components().get(DataComponents.CUSTOM_DATA));
+    }
+
+    private static Mark markOf(CustomData data) {
         if (data == null) return null;
         CompoundTag mine = data.copyTag().getCompoundOrEmpty(TAG);
         if (mine.isEmpty()) return null;
@@ -330,17 +347,84 @@ public final class Gear {
         Long2ObjectMap<ChunkHolder> visible =
                 ((ChunkMapAccessor) level.getChunkSource().chunkMap).lethemc$visibleChunks();
 
+        // Blocks to take out once the walk is done. Removing one edits the chunk's block entity
+        // map, and doing that mid-iteration would throw -- so the positions are collected first
+        // and acted on after. Left null until something actually needs removing, because the
+        // overwhelmingly common sweep finds nothing.
+        List<BlockPos> doomed = null;
+
         for (ChunkHolder holder : visible.values()) {
             LevelChunk chunk = holder.getTickingChunk();
             if (chunk == null) continue;   // still loading; it will come round again
 
             for (BlockEntity be : chunk.getBlockEntities().values()) {
                 if (!(be instanceof Container container)) continue;
-                if (scan(container, null, "at " + be.getBlockPos().toShortString())) {
-                    be.setChanged();
+
+                switch (judgeBlock(be)) {
+                    case WARDED -> { }   // its owner may still be coming back for it
+                    case DOOMED -> {
+                        if (doomed == null) doomed = new ArrayList<>();
+                        doomed.add(be.getBlockPos().immutable());
+                    }
+                    case ORDINARY -> {
+                        if (scan(container, null, "at " + be.getBlockPos().toShortString())) {
+                            be.setChanged();
+                        }
+                    }
                 }
             }
         }
+
+        if (doomed == null) return;
+        for (BlockPos pos : doomed) {
+            // Emptied first so vanilla has nothing left to scatter on the way out. A shulker
+            // box normally spills into the item it drops, and the whole point is that neither
+            // the box nor what was in it survives.
+            if (level.getBlockEntity(pos) instanceof Container c) c.clearContent();
+            level.removeBlock(pos, false);
+        }
+    }
+
+    /** What the sweep should do with a placed block that carries a stamp. */
+    private enum Verdict { ORDINARY, WARDED, DOOMED }
+
+    /**
+     * Judges a placed block as a whole, rather than only its contents.
+     *
+     * <p>A shulker box is the one container that <em>is</em> an item -- it keeps what it holds
+     * when broken, so a box left standing is a stash exactly like a box sitting in a chest, and
+     * treating the two differently would mean the same object survived or died depending on
+     * which way up it was. Emptying it and leaving the box would also be a strange half-measure:
+     * everything the death was meant to take is gone, and what is left is the packaging.
+     *
+     * <p>Nothing else can reach here. A stamp is only ever put on an item that does not stack,
+     * and the shulker box is the only such block in the game -- chests, barrels and the rest
+     * stack, so they are never stamped and always fall through to the ordinary content scan.
+     */
+    private static Verdict judgeBlock(BlockEntity be) {
+        Mark mark = markOf(be);
+        if (mark == null) return Verdict.ORDINARY;
+
+        String living = Incarnations.peek(mark.owner());
+        if (living != null && !living.equals(mark.life())) {
+            String where = "at " + be.getBlockPos().toShortString();
+            if (Config.get().wipeGearLogOnly) {
+                reportBlock(be, where, mark);
+                return Verdict.WARDED;   // report only: change nothing, contents included
+            }
+            LetheMC.LOGGER.info("Destroying placed {} {} -- last held by a life that has ended",
+                    be.getBlockState().getBlock().getName().getString(), where);
+            return Verdict.DOOMED;
+        }
+        return wards(mark) ? Verdict.WARDED : Verdict.ORDINARY;
+    }
+
+    private static void reportBlock(BlockEntity be, String where, Mark mark) {
+        wouldDestroy++;
+        String key = where + "|block|" + mark.owner() + '|' + mark.life();
+        if (!REPORTED.add(key) || REPORTED.size() > REPORT_CAP) return;
+        LetheMC.LOGGER.info("[gear, log only] WOULD destroy placed {} {} -- last held by a life that has ended",
+                be.getBlockState().getBlock().getName().getString(), where);
     }
 
     private static void sweepEntities(ServerLevel level) {
