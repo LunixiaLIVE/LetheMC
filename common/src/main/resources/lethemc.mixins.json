@@ -21,7 +21,10 @@
     "VillagerMixin",
     "BlockEntityAttachMixin",
     "PrimaryLevelDataAccessor",
-    "ServerPlayerDeathMixin"
+    "ServerPlayerDeathMixin",
+    "ChunkMapAccessor",
+    "ItemEntityWardMixin",
+    "SlotWardMixin"
   ],
   "injectors": {
     "defaultRequire": 1
