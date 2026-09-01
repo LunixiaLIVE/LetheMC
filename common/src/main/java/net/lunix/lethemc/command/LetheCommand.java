@@ -6,6 +6,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.lunix.lethemc.Config;
+import net.lunix.lethemc.Gear;
 import net.lunix.lethemc.Graveyard;
 import net.lunix.lethemc.Ledger;
 import net.lunix.lethemc.Messages;
@@ -97,6 +98,15 @@ public final class LetheCommand {
                         .then(Commands.literal("hardcore")
                                 .then(Commands.literal("on").executes(ctx -> setHardcore(ctx.getSource(), true)))
                                 .then(Commands.literal("off").executes(ctx -> setHardcore(ctx.getSource(), false))))
+                        .then(Commands.literal("gear")
+                                .executes(ctx -> gearStatus(ctx.getSource()))
+                                .then(Commands.literal("on").executes(ctx -> gearToggle(ctx.getSource(), true)))
+                                .then(Commands.literal("off").executes(ctx -> gearToggle(ctx.getSource(), false)))
+                                .then(Commands.literal("dryrun")
+                                        .then(Commands.literal("on").executes(ctx -> gearDryRun(ctx.getSource(), true)))
+                                        .then(Commands.literal("off").executes(ctx -> gearDryRun(ctx.getSource(), false))))
+                                .then(Commands.literal("scan").executes(ctx -> gearSweep(ctx.getSource(), false)))
+                                .then(Commands.literal("purge").executes(ctx -> gearSweep(ctx.getSource(), true))))
                         .then(Commands.literal("list").executes(ctx -> list(ctx.getSource())))
                         .then(Commands.literal("status")
                                 .then(Commands.argument("player", StringArgumentType.word())
@@ -248,6 +258,70 @@ public final class LetheCommand {
             return 0;
         }
         src.sendSuccess(() -> Component.literal("§aLetheMC config and ledger reloaded."), true);
+        return 1;
+    }
+
+    // ------------------------------------------------------------------
+    // Admin: stashed gear
+    // ------------------------------------------------------------------
+
+    private static int gearStatus(CommandSourceStack src) {
+        Config c = Config.get();
+        src.sendSuccess(() -> Component.literal(
+                "§6Stashed gear\n"
+                + "§7Reclaiming: " + (c.wipeGear ? "§aon" : "§coff")
+                + "\n§7Mode: " + (c.wipeGearLogOnly ? "§edry run §7(reports, destroys nothing)" : "§aarmed")
+                + "\n§7Sweep every §f" + c.gearCheckIntervalTicks + "§7 ticks"
+                + "\n§8Only items that do not stack are tracked, and only once a living player"
+                + "\n§8has handled them. Anything unstamped is never touched."
+                + "\n§7/lethemc admin gear scan §8-- report what would go, take nothing"), false);
+        return 1;
+    }
+
+    private static int gearToggle(CommandSourceStack src, boolean on) {
+        String problem = Config.get().setKey("wipe.gear", String.valueOf(on));
+        if (problem != null) {
+            src.sendFailure(Component.literal("§c" + problem));
+            return 0;
+        }
+        src.sendSuccess(() -> Component.literal(on
+                ? "§aGear reclamation on. §7Gear last held by an ended life is taken."
+                : "§eGear reclamation off. §7Stamps are left in place, so turning it back on"
+                  + " resumes where it left off."), true);
+        return 1;
+    }
+
+    private static int gearDryRun(CommandSourceStack src, boolean on) {
+        String problem = Config.get().setKey("wipe.gearLogOnly", String.valueOf(on));
+        if (problem != null) {
+            src.sendFailure(Component.literal("§c" + problem));
+            return 0;
+        }
+        src.sendSuccess(() -> Component.literal(on
+                ? "§eDry run on. §7Findings are logged and nothing is destroyed."
+                  + " §8Wards are not enforced either, so players notice nothing."
+                : "§aDry run off. §7Gear is taken for real."), true);
+        return 1;
+    }
+
+    /**
+     * Sweeps now instead of waiting for the interval.
+     *
+     * <p>{@code scan} reports and takes nothing whatever the configured mode is, and {@code
+     * purge} takes things even on a server sitting in dry run. Both are one-off: neither
+     * changes the setting the server goes back to.
+     */
+    private static int gearSweep(CommandSourceStack src, boolean destroy) {
+        if (!Config.get().wipeGear) {
+            src.sendFailure(Component.literal("§cGear reclamation is off. §7/lethemc admin gear on"));
+            return 0;
+        }
+        int n = Gear.sweepNow(src.getServer(), destroy);
+        src.sendSuccess(() -> Component.literal(n == 0
+                ? "§aNothing found. §7No stashed gear in a loaded chunk belongs to an ended life."
+                : (destroy ? "§a" + n + " item(s) destroyed." : "§e" + n + " item(s) would be destroyed.")
+                  + " §8Details in the server log."
+                  + "\n§8Loaded chunks only -- anything elsewhere is dealt with when it loads."), true);
         return 1;
     }
 

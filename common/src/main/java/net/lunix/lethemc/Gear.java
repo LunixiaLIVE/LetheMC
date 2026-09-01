@@ -212,10 +212,19 @@ public final class Gear {
 
     // ------------------------------------------------------------------
 
+    /**
+     * Whether the run currently under way is only reporting.
+     *
+     * <p>Held per run rather than read from config at each item, so {@code /lethemc admin gear}
+     * can force a real purge on a server sitting in log-only, or a report on one that is armed,
+     * without touching the setting the server will go back to.
+     */
+    private static boolean logOnly;
+
     /** Distinct findings already reported this run, so a dry run does not flood the log. */
     private static final java.util.Set<String> REPORTED = new java.util.HashSet<>();
     private static final int REPORT_CAP = 2000;
-    private static int wouldDestroy;
+    private static int found;
 
     /**
      * Reports a finding once.
@@ -226,7 +235,7 @@ public final class Gear {
      * written for learns nothing from it.
      */
     private static void report(ItemStack stack, String where, Mark mark) {
-        wouldDestroy++;
+        found++;
         String key = where + '|' + stack.getItem() + '|' + mark.owner() + '|' + mark.life();
         if (!REPORTED.add(key)) return;
         if (REPORTED.size() > REPORT_CAP) {
@@ -257,10 +266,11 @@ public final class Gear {
             // meant nothing was ever destroyed while the owner sat out the rest of Purgatory.
             String living = Incarnations.peek(mark.owner());
             if (living != null && !living.equals(mark.life())) {
-                if (Config.get().wipeGearLogOnly) {
+                if (logOnly) {
                     report(stack, where, mark);
                     return false;
                 }
+                found++;
                 LetheMC.LOGGER.info("Destroying {} {} -- last held by a life that has ended",
                         stack.getHoverName().getString(), where);
                 return true;
@@ -408,10 +418,11 @@ public final class Gear {
         String living = Incarnations.peek(mark.owner());
         if (living != null && !living.equals(mark.life())) {
             String where = "at " + be.getBlockPos().toShortString();
-            if (Config.get().wipeGearLogOnly) {
+            if (logOnly) {
                 reportBlock(be, where, mark);
                 return Verdict.WARDED;   // report only: change nothing, contents included
             }
+            found++;
             LetheMC.LOGGER.info("Destroying placed {} {} -- last held by a life that has ended",
                     be.getBlockState().getBlock().getName().getString(), where);
             return Verdict.DOOMED;
@@ -420,7 +431,7 @@ public final class Gear {
     }
 
     private static void reportBlock(BlockEntity be, String where, Mark mark) {
-        wouldDestroy++;
+        found++;
         String key = where + "|block|" + mark.owner() + '|' + mark.life();
         if (!REPORTED.add(key) || REPORTED.size() > REPORT_CAP) return;
         LetheMC.LOGGER.info("[gear, log only] WOULD destroy placed {} {} -- last held by a life that has ended",
@@ -480,12 +491,37 @@ public final class Gear {
     /** The periodic pass. Players every time; the world on its own slower interval. */
     public static void sweep(MinecraftServer server, boolean includeWorld) {
         if (!Config.get().wipeGear) return;
-        wouldDestroy = 0;
+        int n = run(server, includeWorld, Config.get().wipeGearLogOnly);
+        if (includeWorld && Config.get().wipeGearLogOnly && n > 0) {
+            LetheMC.LOGGER.info("[gear, log only] {} stashed item(s) in loaded chunks belong to a life that has ended", n);
+        }
+    }
+
+    /**
+     * Runs a sweep right now, on demand, and says how much it found.
+     *
+     * <p>Exists because the interval is the wrong thing to wait on when an admin is actually
+     * asking a question. Reporting is what makes an arming decision possible -- "show me what
+     * you would take" is the whole point of log-only, and a five second wait between asking and
+     * answering makes it a poor conversation.
+     *
+     * <p>Reaches only what is loaded, like everything else here, so the number is "in the world
+     * as it stands right now", not a total. The report set is cleared first so a deliberate
+     * scan lists everything it finds rather than silently skipping what an earlier sweep
+     * already mentioned.
+     *
+     * @param destroy true to actually take things, false to report and change nothing
+     */
+    public static int sweepNow(MinecraftServer server, boolean destroy) {
+        REPORTED.clear();
+        return run(server, true, !destroy);
+    }
+
+    private static int run(MinecraftServer server, boolean includeWorld, boolean dryRun) {
+        logOnly = dryRun;
+        found = 0;
         sweepPlayers(server);
         if (includeWorld) sweepWorld(server);
-        if (includeWorld && Config.get().wipeGearLogOnly && wouldDestroy > 0) {
-            LetheMC.LOGGER.info("[gear, log only] {} stashed item(s) in loaded chunks belong to a life that has ended",
-                    wouldDestroy);
-        }
+        return found;
     }
 }
