@@ -536,6 +536,13 @@ public final class LetheMC {
             Pets.sweep(s);
         }
 
+        // 0c. Take back gear a dead life stashed. Players are checked on the animal interval so
+        // an item cannot be carried off in the gap; containers on their own slower one, because
+        // walking every loaded chunk is a bigger job and does not need to be fast.
+        if (s.getTickCount() % Math.max(1, cfg.petsCheckIntervalTicks) == 0) {
+            Gear.sweep(s, s.getTickCount() % Math.max(1, cfg.gearCheckIntervalTicks) == 0);
+        }
+
         // 1. Kick anyone whose death screen has run its course.
         long holdMillis = cfg.purgatoryDeathScreenSeconds * 1000L;
         for (ServerPlayer player : s.getPlayerList().getPlayers().toArray(new ServerPlayer[0])) {

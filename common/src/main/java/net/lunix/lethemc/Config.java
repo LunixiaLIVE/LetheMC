@@ -99,6 +99,39 @@ public final class Config {
     public boolean wipeVillagers = true;
 
     /**
+     * Destroy stashed gear -- tools, weapons, armour, anything that does not stack -- once the
+     * life that last held it has ended.
+     *
+     * <p>The largest hole this mod had. Death took what you carried and left the chest room
+     * alone, so a supplied player lost one set of armour and walked back to a wall of spares.
+     *
+     * <p>Restricted to unstackable items because the stamp lives in the item's components, and
+     * two stacks whose components differ will not merge. Tagging cobble would leave chests full
+     * of piles that refuse to combine. It is also where the value is -- ore can be re-mined, a
+     * mending netherite set cannot be re-earned in an afternoon.
+     */
+    public boolean wipeGear = true;
+
+    /**
+     * Report what the gear sweep would destroy without destroying anything.
+     *
+     * <p><b>On by default, and deliberately so.</b> Every other setting here takes a pet, a
+     * villager, or a reward flag; this one deletes items out of chests, and a mistake cannot be
+     * undone. An admin should watch a day of log lines on their own world before arming it.
+     */
+    public boolean wipeGearLogOnly = true;
+
+    /**
+     * How often to walk loaded containers, in ticks.
+     *
+     * <p>Slower than the animal sweep because it is a bigger walk and does not need to be fast.
+     * A player who grabs their dead life's sword before the container is scanned is holding a
+     * stale item, and the inventory pass -- which runs every tick the animals do -- destroys it
+     * in their hands.
+     */
+    public int gearCheckIntervalTicks = 100;
+
+    /**
      * How often to look for animals belonging to an ended life, in ticks.
      *
      * <p>Deliberately frequent. The exploit is short-range: park a loaded donkey at spawn,
@@ -198,6 +231,7 @@ public final class Config {
         if (purgatoryDeathScreenSeconds < 0) return "purgatory.deathScreenSeconds cannot be negative.";
         if (wipeGraceMinutes < 1) return "wipe.graceMinutes must be at least 1.";
         if (petsCheckIntervalTicks < 1) return "wipe.petsCheckIntervalTicks must be at least 1.";
+        if (gearCheckIntervalTicks < 1) return "wipe.gearCheckIntervalTicks must be at least 1.";
         if (bypassPermissionLevel < -1 || bypassPermissionLevel > 4) {
             return "bypass.permissionLevel must be -1 (nobody exempt), 0 (everyone) or 1-4.";
         }
@@ -224,7 +258,10 @@ public final class Config {
         m.put("wipe.vaultRewards", String.valueOf(wipeVaultRewards));
         m.put("wipe.villagerReputation", String.valueOf(wipeVillagerReputation));
         m.put("wipe.villagers", String.valueOf(wipeVillagers));
+        m.put("wipe.gear", String.valueOf(wipeGear));
+        m.put("wipe.gearLogOnly", String.valueOf(wipeGearLogOnly));
         m.put("wipe.petsCheckIntervalTicks", String.valueOf(petsCheckIntervalTicks));
+        m.put("wipe.gearCheckIntervalTicks", String.valueOf(gearCheckIntervalTicks));
         m.put("purgatory.minutes", String.valueOf(purgatoryMinutes));
         m.put("purgatory.deathScreenSeconds", String.valueOf(purgatoryDeathScreenSeconds));
         m.put("message.death", messageDeath);
@@ -263,7 +300,10 @@ public final class Config {
                 case "wipe.vaultRewards" -> c.wipeVaultRewards = parseBool(value);
                 case "wipe.villagerReputation" -> c.wipeVillagerReputation = parseBool(value);
                 case "wipe.villagers" -> c.wipeVillagers = parseBool(value);
+                case "wipe.gear" -> c.wipeGear = parseBool(value);
+                case "wipe.gearLogOnly" -> c.wipeGearLogOnly = parseBool(value);
                 case "wipe.petsCheckIntervalTicks" -> c.petsCheckIntervalTicks = Integer.parseInt(value);
+                case "wipe.gearCheckIntervalTicks" -> c.gearCheckIntervalTicks = Integer.parseInt(value);
                 case "purgatory.minutes" -> c.purgatoryMinutes = Integer.parseInt(value);
                 case "purgatory.deathScreenSeconds" -> c.purgatoryDeathScreenSeconds = Integer.parseInt(value);
                 case "message.death" -> c.messageDeath = value;
@@ -302,27 +342,28 @@ public final class Config {
         return c;
     }
 
+    /**
+     * Copies every setting across, by reflection rather than by hand.
+     *
+     * <p>It used to be a written-out list of assignments, and adding a field without adding a
+     * line to it broke {@code /lethemc admin config set} for that field <b>silently</b>: the
+     * command reported success, validation passed, and the value was dropped on the way back
+     * out of the copy. Three new keys shipped that way and the only symptom was a setting that
+     * would not change. A loop cannot forget a field.
+     *
+     * <p>Skips statics (the Gson instance) and finals; every setting here is a plain public
+     * field, so nothing needs to be made accessible.
+     */
     private void copyInto(Config c) {
-        c.wipePlayerData = wipePlayerData;
-        c.wipeAdvancements = wipeAdvancements;
-        c.wipeStats = wipeStats;
-        c.wipeGraceMinutes = wipeGraceMinutes;
-        c.wipeLockFiles = wipeLockFiles;
-        c.wipePets = wipePets;
-        c.wipeLivestock = wipeLivestock;
-        c.wipeFoxes = wipeFoxes;
-        c.wipeVaultRewards = wipeVaultRewards;
-        c.wipeVillagerReputation = wipeVillagerReputation;
-        c.wipeVillagers = wipeVillagers;
-        c.petsCheckIntervalTicks = petsCheckIntervalTicks;
-        c.purgatoryMinutes = purgatoryMinutes;
-        c.purgatoryDeathScreenSeconds = purgatoryDeathScreenSeconds;
-        c.messageDeath = messageDeath;
-        c.messageRejoin = messageRejoin;
-        c.messageDeathScreen = messageDeathScreen;
-        c.messageReincarnation = messageReincarnation;
-        c.bypassPermissionLevel = bypassPermissionLevel;
-        c.adminPermissionLevel = adminPermissionLevel;
+        for (java.lang.reflect.Field f : Config.class.getDeclaredFields()) {
+            int mods = f.getModifiers();
+            if (java.lang.reflect.Modifier.isStatic(mods) || java.lang.reflect.Modifier.isFinal(mods)) continue;
+            try {
+                f.set(c, f.get(this));
+            } catch (IllegalAccessException e) {
+                LetheMC.LOGGER.error("Could not copy config field {}", f.getName(), e);
+            }
+        }
     }
 
     // ------------------------------------------------------------------
