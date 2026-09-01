@@ -115,11 +115,19 @@ public final class Config {
     /**
      * Report what the gear sweep would destroy without destroying anything.
      *
-     * <p><b>On by default, and deliberately so.</b> Every other setting here takes a pet, a
-     * villager, or a reward flag; this one deletes items out of chests, and a mistake cannot be
-     * undone. An admin should watch a day of log lines on their own world before arming it.
+     * <p><b>Off by default</b>, so gear is taken like everything else. Death is meant to cost
+     * you the stash as well as what you were carrying, and a penalty that has to be switched on
+     * is not the default the rest of this file describes.
+     *
+     * <p>Turning it on is still worth doing on an established world, and it is safe to arm
+     * without it: an item with no stamp is never touched, so nothing already in a chest is at
+     * risk. Gear only becomes losable once it has passed through a living player's hands, and
+     * then only on their next death -- the penalty arrives gradually rather than all at once.
+     *
+     * <p>See {@code /lethemc admin gear scan}, which answers "what would you take right now"
+     * without taking anything.
      */
-    public boolean wipeGearLogOnly = true;
+    public boolean wipeGearLogOnly = false;
 
     /**
      * How often to walk loaded containers, in ticks.
