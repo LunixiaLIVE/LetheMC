@@ -218,6 +218,59 @@ give back.
 Animals tamed *before* this feature was installed are never touched, so adding the mod to an
 existing world does not cull everyone's pets.
 
+### Your stashed gear
+
+Death used to take what you were carrying and leave the chest room alone, so a well-supplied
+player lost one set of armour and walked back to a wall of spares. Reincarnation now takes the
+stash too.
+
+**Only items that do not stack** — tools, weapons, armour, elytra, enchanted books, totems,
+shulker boxes, bundles. Cobble, ore and arrows are never touched. That restriction is not
+squeamishness: the tag lives in the item's components, and two stacks whose components differ
+will not merge, so tagging stackables would leave chests full of piles that refuse to combine
+and hopper sorters that quietly stop working. It is also where the value is — ore can be
+re-mined, a mending netherite set cannot be re-earned in an afternoon.
+
+**An item belongs to whoever last held it in their inventory.** Pick something up and it is
+yours; hand it to a friend and it becomes theirs, and it survives your death. Opening a chest or
+a shulker box changes nothing — only passing through an inventory does.
+
+**Every container is searched**, not only the ones gear belongs in. Armour goes in a furnace
+without being smelted and a hopper will hold a sword forever, so the test is whether a thing
+*can* hold an item: chests, barrels, the furnace family, hoppers, droppers, dispensers, brewing
+stands, shulker boxes, crafters, chiseled bookshelves, decorated pots, jukeboxes, chest boats and
+chest minecarts — plus item frames, armour stands, and items lying on the ground.
+
+**A shulker box or bundle is judged as one object.** If it belonged to a life that ended it is
+destroyed whole, with everything inside it, wherever that is — in a chest, in your hand, or
+placed down as a block. What is *inside* is never judged separately: it is carried, not owned,
+and it may well have belonged to somebody else several lives ago. Picking up a container claims
+everything inside it, however deeply nested, so being handed a full shulker means owning it
+without unpacking and repacking.
+
+> ⚠️ **A placed shulker box belongs to whoever placed it.** If another player stores gear in your
+> box and you die, their gear is destroyed along with the box. Only the outermost tag decides,
+> and the alternative — claiming a box by opening it — would let a passer-by quietly protect
+> somebody else's stash. Worth knowing before you share storage.
+
+**While you are in Purgatory your gear cannot be touched.** It cannot be taken out of a chest,
+picked up off the floor if somebody breaks the chest, or destroyed by fire, lava or an explosion,
+and it will not despawn. You are offline and cannot defend it, so nobody gets to empty your base
+while you wait, and nothing can destroy what a resurrection is meant to give back.
+
+**A resurrection keeps everything.** Only reincarnation takes it.
+
+**Gear that was never handled by a living player is never touched**, so installing this on an
+existing world does not empty everybody's chests. Items become losable only once someone has
+held them, and then only on that person's next death — the penalty arrives gradually rather than
+all at once.
+
+**Nothing is scanned that is not loaded.** The sweep walks loaded chunks only and never pulls a
+chunk in to look, so a stash in a chunk nobody has visited is dealt with the moment somebody
+arrives — usually before it finishes appearing on their screen.
+
+---
+
 ### The world remembers you too
 
 Your player files are not the only place your name is kept. Three things out in the world record
@@ -279,7 +332,12 @@ resurrect themselves.
 | `/lethemc admin list` | Everyone currently in Purgatory |
 | `/lethemc admin status <player>` | Their Purgatory, where their data is, whether resurrection still restores it |
 | `/lethemc admin resurrect <player>` | Release from Purgatory, restoring everything if the belongings still exist. **You cannot resurrect yourself** — ask another admin or use the console |
-| `/lethemc admin purge <player>` | Erase their data now, skipping the grace period |
+| `/lethemc admin purge <player>` | Erase their data now, skipping the grace period. **This ends their old life**, so their stashed gear becomes reclaimable — it is not the gear sweep, which is `/lethemc admin gear purge` |
+| `/lethemc admin gear` | Whether gear reclamation is on, which mode, how often it sweeps |
+| `/lethemc admin gear on\|off` | Turn gear reclamation on or off |
+| `/lethemc admin gear dryrun on\|off` | Report findings without destroying anything |
+| `/lethemc admin gear scan` | Report what would be taken right now, and take nothing |
+| `/lethemc admin gear purge` | Run the sweep now instead of waiting for the interval |
 | `/lethemc admin lock <player> [minutes]` | Send someone to Purgatory manually |
 | `/lethemc admin config list` | Show all settings |
 | `/lethemc admin config get <key>` | Read one setting |
@@ -365,6 +423,9 @@ with `/lethemc admin config set`.
 | `wipe.villagerReputation` | `true` | Villagers forget what they thought of a past life |
 | `wipe.villagers` | `true` | Destroy villagers whose only customers have died — **see the warning below** |
 | `wipe.petsCheckIntervalTicks` | `20` | How often to look for animals belonging to an ended life |
+| `wipe.gear` | `true` | Destroy stashed non-stacking items belonging to an ended life |
+| `wipe.gearLogOnly` | `false` | Report what would be destroyed and destroy nothing — see below |
+| `wipe.gearCheckIntervalTicks` | `100` | How often to walk loaded containers |
 | `purgatory.minutes` | `360` | Purgatory length in real-time minutes (6 hours) |
 | `purgatory.deathScreenSeconds` | `15` | How long the death screen is held |
 | `message.death` | — | Shown on the disconnect that follows a death |
@@ -373,6 +434,30 @@ with `/lethemc admin config set`.
 | `message.reincarnation` | — | Greeting when Purgatory ends |
 | `bypass.permissionLevel` | `-1` | Who is exempt from dying. `-1` nobody, `0` everyone, `1`-`4` that op level and above |
 | `admin.permissionLevel` | `4` | Who can run `/lethemc admin ...`. `0`-`4` |
+
+### Trying gear reclamation before you arm it
+
+`wipe.gearLogOnly` makes the sweep report what it *would* destroy and touch nothing. Wards are
+not enforced either, so a dry run is completely invisible to players. Turn it on, leave it for a
+day, and read the log:
+
+```
+[gear, log only] WOULD destroy Diamond Chestplate at 128, 64, -310 -- last held by a life that has ended
+[gear, log only] 11 stashed item(s) in loaded chunks belong to a life that has ended
+```
+
+Findings are reported once each, not once per sweep, and `/lethemc admin gear scan` gives you the
+same answer immediately instead of waiting for the interval.
+
+### Sweep cost
+
+`wipe.gearCheckIntervalTicks` is unfloored on purpose — if you are editing a tick interval you
+know what you are asking for. Measured at **1–2 ms for 400 containers across 88 loaded chunks**,
+and at 20 ticks a stale item is destroyed within about 200 ms of being found.
+
+The cost scales with **how many containers are loaded**, not how many chunks — so a server with
+large storage rooms should lower this with more care than an empty one. The default of 100 ticks
+is five seconds, which is well below anything a player can react to.
 
 **`purgatory.minutes` must be greater than `wipe.graceMinutes`.** Both are in minutes, so at the
 defaults that means a minimum Purgatory of 6 minutes. Values that break the rule are rejected with a message
